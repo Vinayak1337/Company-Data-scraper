@@ -1,37 +1,40 @@
-<div id="company-panel" class="rounded-lg border border-white/10 bg-[#101624]/90 p-4">
-  <div class="flex items-center justify-between">
-    <h2 class="text-base font-semibold text-white">Scrape</h2>
-    <span class="rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-indigo-200">{{ companies|length }}</span>
+<div id="company-panel" class="rounded-lg border border-warmLine bg-paper p-4 shadow-soft">
+  <div class="flex items-center justify-between gap-3 border-b border-warmLine pb-3">
+    <div>
+      <h2 class="text-base font-semibold text-charcoal">Companies</h2>
+      <p class="mt-0.5 text-xs text-muted">Add URL and scrape</p>
+    </div>
+    <span class="rounded-full border border-gold/30 bg-goldSoft px-2.5 py-1 text-xs font-semibold text-charcoal">{{ companies|length }}</span>
   </div>
 
   <form class="mt-4 space-y-2.5" hx-post="{% url 'add_company' %}" hx-target="#company-panel" hx-swap="outerHTML">
     {% csrf_token %}
-    <input name="name" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Company name optional">
-    <input name="careers_url" type="url" required class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Careers or ATS URL">
-    <button class="w-full rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500">Add company</button>
+    <input name="name" class="h-10 w-full rounded-md border border-warmLine bg-paper px-3 text-sm text-charcoal outline-none placeholder:text-muted/70 focus:border-gold focus:ring-2 focus:ring-gold/25" placeholder="Company name optional">
+    <input name="careers_url" type="url" required class="h-10 w-full rounded-md border border-warmLine bg-paper px-3 text-sm text-charcoal outline-none placeholder:text-muted/70 focus:border-gold focus:ring-2 focus:ring-gold/25" placeholder="Careers or ATS URL">
+    <button class="w-full rounded-md bg-gold px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-goldDark">Add company</button>
   </form>
 
-  <div class="mt-4 max-h-[680px] divide-y divide-white/10 overflow-auto pr-1">
+  <div class="mt-4 max-h-[680px] divide-y divide-warmLine overflow-auto pr-1">
     {% for company in companies %}
       <article class="py-3">
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <h3 class="truncate text-sm font-semibold text-white">{{ company.name }}</h3>
-            <p class="mt-1 truncate text-xs text-slate-500">{{ company.job_count }} jobs · {{ company.last_scrape_status }}</p>
+            <h3 class="truncate text-sm font-semibold text-charcoal">{{ company.name }}</h3>
+            <p class="mt-1 truncate text-xs text-muted">{{ company.job_count }} jobs · {{ company.last_scrape_status }}</p>
           </div>
-          <span class="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-400">{{ company.scraper_type }}</span>
+          <span class="shrink-0 rounded-full border border-warmLine bg-cream px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">{{ company.scraper_type }}</span>
         </div>
         {% if company.last_scrape_message %}
-          <p class="mt-2 line-clamp-1 text-xs text-slate-500">{{ company.last_scrape_message }}</p>
+          <p class="mt-2 line-clamp-1 text-xs text-muted">{{ company.last_scrape_message }}</p>
         {% endif %}
         <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
-          <button class="rounded-md bg-success/90 px-3 py-2 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-400"
+          <button class="rounded-md bg-gold px-3 py-2 text-xs font-semibold text-white transition hover:bg-goldDark"
                   hx-post="{% url 'scrape_company' company.id %}"
                   hx-target="#dashboard-content"
                   hx-swap="innerHTML">
             Scrape
           </button>
-          <button class="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+          <button class="rounded-md border border-warmLine px-3 py-2 text-xs font-semibold text-muted transition hover:border-gold hover:text-charcoal"
                   hx-post="{% url 'delete_company' company.id %}"
                   hx-target="#company-panel"
                   hx-swap="outerHTML">
@@ -40,7 +43,7 @@
         </div>
       </article>
     {% empty %}
-      <div class="rounded-lg border border-dashed border-white/15 p-4 text-sm text-slate-400">No companies yet. Add a careers or ATS URL to start.</div>
+      <div class="rounded-lg border border-dashed border-warmLine bg-cream p-4 text-sm text-muted">No companies yet. Add a careers or ATS URL to start.</div>
     {% endfor %}
   </div>
 </div>
