@@ -20,7 +20,7 @@ class ApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(Company.objects.get().scraper_type, "greenhouse")
+        self.assertEqual(Company.objects.get(careers_url="https://boards.greenhouse.io/acme").scraper_type, "greenhouse")
 
     def test_jobs_list(self):
         company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")

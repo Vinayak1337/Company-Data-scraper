@@ -13,7 +13,7 @@ class DashboardTests(TestCase):
         response = self.client.post(reverse("add_company"), {"careers_url": "https://jobs.lever.co/acme"})
 
         self.assertEqual(response.status_code, 302)
-        company = Company.objects.get()
+        company = Company.objects.get(careers_url="https://jobs.lever.co/acme")
         self.assertEqual(company.scraper_type, "lever")
 
     def test_jobs_filter_by_title(self):
@@ -51,4 +51,5 @@ class DashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Job.objects.count(), 1)
-        self.assertEqual(Company.objects.get().last_scrape_status, "success")
+        company.refresh_from_db()
+        self.assertEqual(company.last_scrape_status, "success")

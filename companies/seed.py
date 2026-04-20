@@ -1,0 +1,18 @@
+TOP_TIER_COMPANIES = [
+    ("Microsoft", "https://apply.careers.microsoft.com/careers?start=0&sort_by=relevance&filter_include_remote=1", "microsoft"),
+    ("OpenAI", "https://jobs.ashbyhq.com/OpenAI", "ashby"),
+    ("Anthropic", "https://job-boards.greenhouse.io/anthropic", "greenhouse"),
+    ("Stripe", "https://stripe.com/jobs/search", "generic"),
+    ("Google", "https://www.google.com/about/careers/applications/jobs/results", "generic"),
+    ("Amazon", "https://www.amazon.jobs/en/search", "generic"),
+    ("Apple", "https://jobs.apple.com/en-us/search", "generic"),
+    ("Meta", "https://www.metacareers.com/jobs", "generic"),
+    ("NVIDIA", "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "generic"),
+    ("Netflix", "https://explore.jobs.netflix.net/careers", "generic"),
+    ("Uber", "https://www.uber.com/us/en/careers/list/", "generic"),
+    ("Airbnb", "https://careers.airbnb.com/positions/", "generic"),
+    ("Databricks", "https://www.databricks.com/company/careers/open-positions", "generic"),
+    ("Notion", "https://www.notion.com/careers", "generic"),
+    ("Cloudflare", "https://www.cloudflare.com/careers/jobs/", "generic"),
+    ("GitHub", "https://www.github.careers/careers-home/jobs", "generic"),
+]
