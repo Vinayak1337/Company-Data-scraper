@@ -16,6 +16,22 @@ Self-hosted Django + HTMX job scraper. Paste a careers or ATS URL, scrape jobs, 
 
 ## Local Setup
 
+Fast path:
+
+```bash
+./start.sh
+```
+
+Or:
+
+```bash
+npm start
+```
+
+The start script creates `.venv` if needed, installs Python deps, installs Node deps if needed, builds Tailwind, runs migrations, seeds default companies, and starts Django.
+
+Manual setup:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
