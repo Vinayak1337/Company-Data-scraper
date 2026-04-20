@@ -1,14 +1,14 @@
-<div class="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
-  <aside class="xl:sticky xl:top-6 xl:self-start">
-    {% include "dashboard/partials/filter_bar.html" %}
+<div class="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
+  <aside class="min-w-0 xl:sticky xl:top-5 xl:self-start">
+    {% include "dashboard/partials/company_panel.html" %}
   </aside>
-  <section class="min-w-0 rounded-lg border border-white/10 bg-panel/80 shadow-glow backdrop-blur">
+  <section class="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-[#101624]/90">
     <div id="job-detail"></div>
     <div id="jobs-table">
       {% include "dashboard/partials/jobs_table.html" %}
     </div>
   </section>
-  <aside class="xl:sticky xl:top-6 xl:self-start">
-    {% include "dashboard/partials/company_panel.html" %}
+  <aside class="min-w-0 xl:sticky xl:top-5 xl:self-start">
+    {% include "dashboard/partials/filter_bar.html" %}
   </aside>
 </div>

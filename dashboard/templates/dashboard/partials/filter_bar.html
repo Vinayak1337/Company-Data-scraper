@@ -1,29 +1,29 @@
-<form class="rounded-lg border border-white/10 bg-panel/80 p-5 shadow-glow backdrop-blur"
+<form class="rounded-lg border border-white/10 bg-[#101624]/90 p-4"
       hx-get="{% url 'jobs_partial' %}"
       hx-target="#jobs-table"
       hx-trigger="input changed delay:250ms, change, submit">
   <div class="flex items-center justify-between gap-3">
     <div>
-      <h2 class="text-lg font-semibold text-white">Filters</h2>
-      <p class="mt-1 text-sm text-slate-500">India by default</p>
+      <h2 class="text-base font-semibold text-white">Filters</h2>
+      <p class="mt-0.5 text-xs text-slate-500">India by default</p>
     </div>
-    <a href="{% url 'dashboard' %}" class="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/5">Reset</a>
+    <a href="{% url 'dashboard' %}" class="rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/5">Reset</a>
   </div>
 
-  <div class="mt-5 space-y-4">
+  <div class="mt-4 space-y-3">
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Search</span>
-      <input name="q" value="{{ filters.q }}" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Role, company, keyword">
+      <input name="q" value="{{ filters.q }}" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Role, company, keyword">
     </label>
 
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Title</span>
-      <input name="title" value="{{ filters.title }}" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Backend, data, intern">
+      <input name="title" value="{{ filters.title }}" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Backend, data, intern">
     </label>
 
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Company</span>
-      <select name="company" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+      <select name="company" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
         <option value="">All companies</option>
         {% for company in companies %}
           <option value="{{ company.id }}" {% if filters.company == company.id|stringformat:"s" %}selected{% endif %}>{{ company.name }}</option>
@@ -34,14 +34,14 @@
     <div class="grid grid-cols-2 gap-3">
       <label>
         <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Scope</span>
-        <select name="country" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+        <select name="country" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
           <option value="India" {% if filters.country == "India" %}selected{% endif %}>India</option>
           <option value="global" {% if filters.country == "global" %}selected{% endif %}>Global</option>
         </select>
       </label>
       <label>
         <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Mode</span>
-        <select name="remote" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+        <select name="remote" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
           <option value="">Any</option>
           <option value="remote" {% if filters.remote == "remote" %}selected{% endif %}>Remote</option>
           <option value="hybrid" {% if filters.remote == "hybrid" %}selected{% endif %}>Hybrid</option>
@@ -52,7 +52,7 @@
 
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">State / region</span>
-      <select name="state" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+      <select name="state" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
         {% for value,label in india_states %}
           <option value="{{ value }}" {% if filters.state == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -61,7 +61,7 @@
 
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">City</span>
-      <select name="city" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+      <select name="city" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 focus:ring-2">
         {% for value,label in india_cities %}
           <option value="{{ value }}" {% if filters.city == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -70,16 +70,16 @@
 
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Location text</span>
-      <input name="location" value="{{ filters.location }}" class="h-11 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Optional exact text">
+      <input name="location" value="{{ filters.location }}" class="h-10 w-full rounded-md border border-white/10 bg-ink px-3 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Optional exact text">
     </label>
   </div>
 
-  <div class="mt-5">
+  <div class="mt-4">
     <div class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Tech stack</div>
-    <div class="flex max-h-[220px] flex-wrap gap-2 overflow-auto pr-1">
-      <button name="tech" value="" class="rounded-full border {% if not filters.tech %}border-brand bg-brand/15 text-white{% else %}border-white/10 text-slate-300{% endif %} px-3 py-1.5 text-xs font-medium transition hover:border-brand hover:text-white">All</button>
+    <div class="flex max-h-[150px] flex-wrap gap-1.5 overflow-auto pr-1">
+      <button name="tech" value="" class="rounded-full border {% if not filters.tech %}border-brand bg-brand/15 text-white{% else %}border-white/10 text-slate-300{% endif %} px-2.5 py-1 text-xs font-medium transition hover:border-brand hover:text-white">All</button>
       {% for tag in tags %}
-        <button name="tech" value="{{ tag }}" class="rounded-full border {% if filters.tech == tag %}border-brand bg-brand/15 text-white{% else %}border-white/10 text-slate-300{% endif %} px-3 py-1.5 text-xs font-medium transition hover:border-brand hover:text-white">{{ tag }}</button>
+        <button name="tech" value="{{ tag }}" class="rounded-full border {% if filters.tech == tag %}border-brand bg-brand/15 text-white{% else %}border-white/10 text-slate-300{% endif %} px-2.5 py-1 text-xs font-medium transition hover:border-brand hover:text-white">{{ tag }}</button>
       {% endfor %}
     </div>
   </div>

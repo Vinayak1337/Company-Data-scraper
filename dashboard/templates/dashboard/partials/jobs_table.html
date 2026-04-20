@@ -1,7 +1,7 @@
 <div class="overflow-hidden">
-  <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+  <div class="flex flex-col gap-1 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      <h2 class="text-lg font-semibold text-white">Jobs</h2>
+      <h2 class="text-xl font-semibold text-white">Jobs</h2>
       <p class="text-sm text-slate-500">
         {% if filters.country == "India" %}India{% else %}Global{% endif %}
         {% if filters.state %} · {{ filters.state }}{% endif %}
@@ -10,12 +10,12 @@
     </div>
     <span class="rounded-full bg-white/5 px-3 py-1 text-sm text-slate-300">{{ jobs|length }} visible</span>
   </div>
-  <div class="max-h-[720px] space-y-3 overflow-auto px-4 pb-4">
+  <div class="max-h-[760px] divide-y divide-white/10 overflow-auto">
     {% for job in jobs %}
-      <article class="rounded-lg border border-white/10 bg-white/[0.035] p-4 transition hover:border-brand/50 hover:bg-white/[0.055]">
+      <article class="bg-transparent p-5 transition hover:bg-white/[0.035]">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
-            <button class="text-left text-lg font-semibold leading-6 text-white hover:text-indigo-300"
+            <button class="text-left text-base font-semibold leading-6 text-white hover:text-indigo-300 sm:text-lg"
                     hx-get="{% url 'job_detail_partial' job.id %}"
                     hx-target="#job-detail"
                     hx-swap="innerHTML">
@@ -41,7 +41,7 @@
         </div>
       </article>
     {% empty %}
-      <div class="rounded-lg border border-dashed border-white/15 p-10 text-center text-slate-400">No jobs match the current filters.</div>
+      <div class="m-5 rounded-lg border border-dashed border-white/15 p-10 text-center text-slate-400">No jobs match the current filters.</div>
     {% endfor %}
   </div>
 </div>
