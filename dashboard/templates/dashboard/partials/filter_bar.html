@@ -1,0 +1,27 @@
+<form class="border-b border-white/10 p-4"
+      hx-get="{% url 'jobs_partial' %}"
+      hx-target="#jobs-table"
+      hx-trigger="input changed delay:250ms, change">
+  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+    <input name="q" value="{{ filters.q }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2 xl:col-span-2" placeholder="Search title, company, description">
+    <input name="title" value="{{ filters.title }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Title">
+    <input name="location" value="{{ filters.location }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Location">
+    <select name="company" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+      <option value="">All companies</option>
+      {% for company in companies %}
+        <option value="{{ company.id }}" {% if filters.company == company.id|stringformat:"s" %}selected{% endif %}>{{ company.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="remote" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 focus:ring-2">
+      <option value="">Any mode</option>
+      <option value="remote" {% if filters.remote == "remote" %}selected{% endif %}>Remote</option>
+      <option value="hybrid" {% if filters.remote == "hybrid" %}selected{% endif %}>Hybrid</option>
+      <option value="onsite" {% if filters.remote == "onsite" %}selected{% endif %}>Onsite</option>
+    </select>
+  </div>
+  <div class="mt-3 flex flex-wrap gap-2">
+    {% for tag in tags %}
+      <button name="tech" value="{{ tag }}" class="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:border-brand hover:text-white">{{ tag }}</button>
+    {% endfor %}
+  </div>
+</form>

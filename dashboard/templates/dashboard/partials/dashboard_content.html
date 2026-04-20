@@ -1,0 +1,16 @@
+<div class="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+  <aside>
+    {% include "dashboard/partials/company_panel.html" %}
+  </aside>
+  <section class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div class="min-w-0 rounded-lg border border-white/10 bg-panel/80 shadow-glow backdrop-blur">
+      {% include "dashboard/partials/filter_bar.html" %}
+      <div id="jobs-table">
+        {% include "dashboard/partials/jobs_table.html" %}
+      </div>
+    </div>
+    <aside id="job-detail" class="min-h-[360px]">
+      {% include "dashboard/partials/job_detail.html" %}
+    </aside>
+  </section>
+</div>

@@ -1,0 +1,18 @@
+<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+  <div class="text-2xl font-semibold text-white">{{ stats.total_jobs }}</div>
+  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Jobs</div>
+</div>
+<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+  <div class="text-2xl font-semibold text-white">{{ stats.active_companies }}</div>
+  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Companies</div>
+</div>
+<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+  <div class="text-2xl font-semibold text-white">{{ stats.jobs_today }}</div>
+  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Today</div>
+</div>
+<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+  <div class="truncate text-sm font-semibold text-white">
+    {% if stats.last_log %}{{ stats.last_log.get_status_display }}{% else %}Idle{% endif %}
+  </div>
+  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Last scrape</div>
+</div>

@@ -1,0 +1,23 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Job Scout</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+    <script>
+      document.addEventListener("htmx:configRequest", function (event) {
+        const token = document.cookie.split("; ").find((row) => row.startsWith("csrftoken="));
+        if (token) {
+          event.detail.headers["X-CSRFToken"] = decodeURIComponent(token.split("=")[1]);
+        }
+      });
+    </script>
+  </head>
+  <body class="min-h-screen bg-ink text-slate-100 antialiased">
+    <div class="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),transparent_34%),linear-gradient(135deg,#0B0F19_0%,#111827_50%,#07111F_100%)]"></div>
+    {% block content %}{% endblock %}
+  </body>
+</html>
