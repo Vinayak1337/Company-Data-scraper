@@ -5,12 +5,22 @@ from django.views.decorators.http import require_GET, require_POST
 from companies.models import Company, ScrapeLog
 from jobs.models import Job
 
-from .services import company_counts, create_company_from_url, dashboard_stats, filter_jobs, scrape_company_jobs, tag_cloud
+from .services import (
+    INDIA_CITY_CHOICES,
+    INDIA_STATE_CHOICES,
+    company_counts,
+    create_company_from_url,
+    dashboard_stats,
+    filter_jobs,
+    normalized_filters,
+    scrape_company_jobs,
+    tag_cloud,
+)
 
 
 def dashboard(request: HttpRequest) -> HttpResponse:
     context = base_context(request)
-    context["selected_job"] = Job.objects.select_related("company").first()
+    context["selected_job"] = None
     return render(request, "dashboard/index.html", context)
 
 
@@ -54,11 +64,14 @@ def job_detail_partial(request: HttpRequest, job_id: int) -> HttpResponse:
 
 
 def base_context(request: HttpRequest) -> dict:
+    filters = normalized_filters(request.GET)
     return {
         "stats": dashboard_stats(),
         "companies": company_counts(),
         "jobs": filter_jobs(request.GET),
         "tags": tag_cloud(),
+        "india_states": INDIA_STATE_CHOICES,
+        "india_cities": INDIA_CITY_CHOICES,
         "recent_logs": ScrapeLog.objects.select_related("company")[:5],
-        "filters": request.GET,
+        "filters": filters,
     }

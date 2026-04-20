@@ -24,7 +24,7 @@ class ApiTests(TestCase):
 
     def test_jobs_list(self):
         company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")
-        Job.objects.create(company=company, title="Frontend Engineer", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever", tags=["react"])
+        Job.objects.create(company=company, title="Frontend Engineer", location="Bengaluru, India", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever", tags=["react"])
 
         response = self.client.get(reverse("api_jobs"), {"tech": "react"})
 

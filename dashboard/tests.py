@@ -18,13 +18,33 @@ class DashboardTests(TestCase):
 
     def test_jobs_filter_by_title(self):
         company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")
-        Job.objects.create(company=company, title="Backend Engineer", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever")
-        Job.objects.create(company=company, title="Product Designer", apply_url="https://x/2", source_url=company.careers_url, source_platform="lever")
+        Job.objects.create(company=company, title="Backend Engineer", location="Bengaluru, India", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever")
+        Job.objects.create(company=company, title="Product Designer", location="Bengaluru, India", apply_url="https://x/2", source_url=company.careers_url, source_platform="lever")
 
         response = self.client.get(reverse("jobs_partial"), {"title": "backend"})
 
         self.assertContains(response, "Backend Engineer")
         self.assertNotContains(response, "Product Designer")
+
+    def test_jobs_default_to_india_scope(self):
+        company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")
+        Job.objects.create(company=company, title="India Role", location="New Delhi, DL,IN, IN", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever")
+        Job.objects.create(company=company, title="US Role", location="San Francisco, CA", apply_url="https://x/2", source_url=company.careers_url, source_platform="lever")
+
+        response = self.client.get(reverse("jobs_partial"))
+
+        self.assertContains(response, "India Role")
+        self.assertNotContains(response, "US Role")
+
+    def test_jobs_can_filter_india_city(self):
+        company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")
+        Job.objects.create(company=company, title="Delhi Role", location="New Delhi, DL,IN, IN", apply_url="https://x/1", source_url=company.careers_url, source_platform="lever")
+        Job.objects.create(company=company, title="Bengaluru Role", location="Bengaluru, India", apply_url="https://x/2", source_url=company.careers_url, source_platform="lever")
+
+        response = self.client.get(reverse("jobs_partial"), {"city": "Delhi"})
+
+        self.assertContains(response, "Delhi Role")
+        self.assertNotContains(response, "Bengaluru Role")
 
     @patch("dashboard.services.scrape")
     def test_scrape_company_upserts_jobs(self, mock_scrape):

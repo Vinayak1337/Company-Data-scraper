@@ -11,6 +11,7 @@ Self-hosted Django + HTMX job scraper. Paste a careers or ATS URL, scrape jobs, 
 - Microsoft Careers job-detail URLs via structured `JobPosting` data.
 - Curated top-tier companies seeded on migration.
 - Local filters for title, keyword, company, location, tech stack, and work mode.
+- India-first default feed with state and city filters.
 - Simple JSON API.
 - Render deployment files included.
 
