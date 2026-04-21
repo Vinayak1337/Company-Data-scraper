@@ -76,6 +76,7 @@ def database_from_url(url: str) -> dict:
         "PASSWORD": parsed.password or "",
         "HOST": parsed.hostname or "",
         "PORT": parsed.port or "",
+        "OPTIONS": {"sslmode": "require"},
     }
 
 
