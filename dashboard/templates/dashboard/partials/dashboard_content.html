@@ -1,16 +1,19 @@
-<div class="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
-  <aside class="min-w-0 xl:sticky xl:top-5 xl:self-start">
+<div class="mt-6 grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
+  <!-- Filters Sidebar — always sticky, always scrolls independently -->
+  <aside class="min-w-0 sticky top-[72px] self-start max-h-[calc(100vh-88px)] overflow-y-auto scroll-luxe pl-1 pr-1 pt-2">
     {% include "dashboard/partials/filter_bar.html" %}
   </aside>
 
-  <section class="min-w-0 overflow-hidden rounded-lg border border-warmLine bg-paper shadow-soft">
+  <!-- Main Jobs List -->
+  <section class="min-w-0 flex flex-col gap-6 pt-2">
     <div id="job-detail"></div>
     <div id="jobs-table">
       {% include "dashboard/partials/jobs_table.html" %}
     </div>
   </section>
 
-  <aside class="min-w-0 xl:sticky xl:top-5 xl:self-start">
+  <!-- Companies / Management — always sticky, always scrolls independently -->
+  <aside class="min-w-0 sticky top-[72px] self-start max-h-[calc(100vh-88px)] overflow-y-auto scroll-luxe pr-1 pt-2">
     {% include "dashboard/partials/company_panel.html" %}
   </aside>
 </div>

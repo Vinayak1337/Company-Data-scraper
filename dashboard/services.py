@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -195,14 +197,25 @@ def dashboard_stats() -> dict:
 
 
 def tag_cloud() -> list[str]:
-    tags = []
+    counter: Counter[str] = Counter()
     for row in Job.objects.exclude(tags=[]).values_list("tags", flat=True):
-        tags.extend(row)
-    return sorted(set(tags))[:40]
+        counter.update(row)
+    return [tag for tag, _ in counter.most_common(40)]
 
 
 def company_counts():
     return Company.objects.annotate(job_count=Count("jobs")).order_by("name")
+
+
+def reset_all_jobs() -> dict:
+    deleted_jobs, _ = Job.objects.all().delete()
+    deleted_logs, _ = ScrapeLog.objects.all().delete()
+    Company.objects.update(
+        last_scraped_at=None,
+        last_scrape_status="never",
+        last_scrape_message="",
+    )
+    return {"jobs": deleted_jobs, "logs": deleted_logs}
 
 
 def infer_name_from_url(url: str) -> str:

@@ -1,3 +1,6 @@
+import os
+import sys
+
 from django.core.management.base import BaseCommand
 
 from companies.models import Company
@@ -29,3 +32,13 @@ class Command(BaseCommand):
                 company.save(update_fields=["name", "scraper_type", "updated_at"])
                 updated += 1
         self.stdout.write(self.style.SUCCESS(f"Seeded companies. Created {created}, updated {updated}."))
+
+
+if __name__ == "__main__":
+    # Allow running directly: python seed_companies.py
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../"))
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "jobhunt.settings")
+    import django
+    django.setup()
+    from django.core.management import call_command
+    call_command("seed_companies")
