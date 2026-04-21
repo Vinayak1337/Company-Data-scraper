@@ -2,6 +2,12 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      (function () {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+      })();
+    </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Job Scout — Premium Careers Intelligence</title>
@@ -19,7 +25,7 @@
       });
 
       // Toast system — listens for HX-Trigger: {"toast": {"type":"success","msg":"..."}}
-      document.body && document.body.addEventListener && (function () {
+      (function () {
         function showToast(detail) {
           if (!detail || !detail.msg) return;
           var root = document.getElementById("toast-root");
@@ -42,7 +48,6 @@
         }
         window.addEventListener("DOMContentLoaded", function () {
           document.body.addEventListener("toast", function (e) { showToast(e.detail); });
-          // Close job-detail modal on Escape
           document.addEventListener("keydown", function (e) {
             if (e.key === "Escape") {
               var el = document.getElementById("job-detail");
@@ -50,10 +55,17 @@
             }
           });
         });
+
       })();
+
+      window.toggleTheme = function () {
+        var html = document.documentElement;
+        var isDark = html.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      };
     </script>
   </head>
-  <body class="min-h-screen bg-cream text-charcoal antialiased">
+  <body class="min-h-screen bg-cream dark:bg-dk-bg text-charcoal dark:text-dk-text antialiased transition-colors duration-300">
     <div id="toast-root"></div>
     {% block content %}{% endblock %}
   </body>

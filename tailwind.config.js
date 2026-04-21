@@ -1,4 +1,5 @@
 module.exports = {
+  darkMode: 'class',
   content: [
     "./templates/**/*.html",
     "./companies/templates/**/*.html",
@@ -22,7 +23,15 @@ module.exports = {
         goldSoft: "#FDE68A",
         charcoal: "#1F2933",
         muted: "#6B7280",
-        warmLine: "#E7DEC8"
+        warmLine: "#E7DEC8",
+        'dk-bg': '#1A1A1A',
+        'dk-surface': '#222222',
+        'dk-paper': '#2A2A2A',
+        'dk-border': '#383838',
+        'dk-gold': '#C9A84C',
+        'dk-goldText': '#E8CC80',
+        'dk-text': '#F0EDE8',
+        'dk-muted': '#8A8A8A'
       },
       boxShadow: {
         glow: "0 0 20px rgba(212,175,55,0.45), 0 0 48px rgba(212,175,55,0.18)",

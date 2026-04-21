@@ -2,7 +2,7 @@
 
 {% block content %}
   <!-- Top Navigation -->
-  <header class="sticky top-0 z-30 border-b border-warmLine/70 bg-paper/80 backdrop-blur-xl shadow-elev-1">
+  <header class="sticky top-0 z-30 border-b border-warmLine/70 dark:border-dk-border/70 bg-paper/80 dark:bg-dk-surface/90 backdrop-blur-xl shadow-elev-1">
     <div class="absolute inset-x-0 top-0 h-full bg-hero-radial pointer-events-none"></div>
     <div class="relative mx-auto flex max-w-[1600px] items-center justify-between gap-6 px-6 py-4">
       <!-- Logo -->
@@ -13,19 +13,32 @@
           </svg>
         </span>
         <div class="leading-tight">
-          <h1 style="font-family:Fraunces,serif" class="text-xl font-bold tracking-tight text-charcoal">Job Scout</h1>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-goldDark">Careers Intelligence</p>
+          <h1 style="font-family:Fraunces,serif" class="text-xl font-bold tracking-tight text-charcoal dark:text-dk-text">Job Scout</h1>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-goldDark dark:text-dk-gold">Careers Intelligence</p>
         </div>
       </div>
 
-      <!-- Reset button -->
+      <!-- Actions -->
       <div class="flex items-center gap-2">
+        <!-- Theme toggle -->
+        <button id="theme-toggle" type="button" onclick="toggleTheme()"
+                aria-label="Switch to dark mode"
+                class="inline-flex items-center justify-center h-9 w-9 rounded-xl border border-warmLine/80 dark:border-dk-border bg-paper dark:bg-dk-paper text-charcoal dark:text-dk-text shadow-elev-1 transition hover:border-gold/50 dark:hover:border-dk-gold/50 hover:-translate-y-0.5">
+          <!-- Sun icon (shown in dark mode) -->
+          <svg class="hidden dark:block h-4 w-4 text-dk-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+          </svg>
+          <!-- Moon icon (shown in light mode) -->
+          <svg class="block dark:hidden h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
         <button type="button"
                 hx-post="{% url 'reset_jobs' %}"
                 hx-target="#dashboard-content"
                 hx-swap="innerHTML"
                 hx-confirm="Reset all scraped jobs and scrape logs? Your companies list will be kept intact."
-                class="inline-flex items-center gap-2 rounded-xl border border-warmLine/80 bg-paper px-4 py-2 text-xs font-bold text-charcoal shadow-elev-1 transition hover:border-danger/50 hover:text-danger hover:-translate-y-0.5 active:translate-y-0">
+                class="inline-flex items-center gap-2 rounded-xl border border-warmLine/80 dark:border-dk-border bg-paper dark:bg-dk-paper px-4 py-2 text-xs font-bold text-charcoal dark:text-dk-text shadow-elev-1 transition hover:border-danger/50 hover:text-danger hover:-translate-y-0.5 active:translate-y-0">
           <svg class="h-3.5 w-3.5 htmx-indicator-hide" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M20 20v-5h-.581m0 0a8.003 8.003 0 01-15.357-2"/>
           </svg>
