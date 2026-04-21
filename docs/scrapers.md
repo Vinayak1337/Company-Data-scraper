@@ -27,3 +27,5 @@ To add a scraper:
 4. Add tests in `scrapers_engine/tests.py`.
 
 Keep adapters deterministic in v1. Do not add AI parsing to this branch.
+
+Microsoft Careers pages are handled through `application/ld+json` `JobPosting` data. A Microsoft search URL without a selected job may expose no job postings to static HTML; a URL containing `pid=...` is the most reliable input for that adapter.

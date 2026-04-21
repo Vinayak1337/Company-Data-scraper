@@ -4,10 +4,361 @@
 
 @layer base {
   * {
-    scrollbar-color: #374151 #0b0f19;
+    @apply caret-gold accent-gold selection:bg-gold/30 selection:text-charcoal;
   }
 
   body {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(1100px 520px at 90% -10%, rgba(212,175,55,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(253,230,138,0.18), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .scroll-luxe::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-luxe::-webkit-scrollbar-track { background: transparent; }
+  .scroll-luxe::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #D4AF37, #996515);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scroll-luxe::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #E7C678, #996515);
+    background-clip: padding-box;
+  }
+  .scroll-luxe { scrollbar-width: thin; scrollbar-color: #D4AF37 transparent; }
+
+  .stat-card {
+    @apply relative overflow-hidden rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-elev-2;
+  }
+  .stat-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(212,175,55,0.10), transparent 60%);
+    pointer-events: none;
+  }
+  .stat-number {
+    @apply text-3xl font-bold tracking-tight text-charcoal;
+  }
+  .stat-label {
+    @apply text-[11px] font-bold uppercase tracking-[0.14em] text-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-charcoal ring-1 ring-warmLine backdrop-blur-sm;
+  }
+
+  /* htmx loading indicator */
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline-flex; }
+  .htmx-request .htmx-indicator-hide { display: none; }
+  .htmx-request.opacity-while-loading,
+  .htmx-request .opacity-while-loading { opacity: 0.55; pointer-events: none; }
+
+  /* Toast */
+  #toast-root {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    min-width: 260px;
+    max-width: 380px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1F2933;
+    background: #FFFFFF;
+    box-shadow: 0 18px 42px rgba(31,41,51,0.12), 0 2px 6px rgba(31,41,51,0.08);
+    border: 1px solid #E7DEC8;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: toast-in 0.25s cubic-bezier(0.22,0.61,0.36,1) both;
+  }
+  .toast.toast-success { border-left: 4px solid #D4AF37; }
+  .toast.toast-error { border-left: 4px solid #DC2626; color: #7F1D1D; }
+  .toast-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    margin-top: 5px; flex-shrink: 0;
+    background: #D4AF37;
+  }
+  .toast.toast-error .toast-dot { background: #DC2626; }
+
+  .scroll-fade-bottom {
+    mask-image: linear-gradient(to bottom, black 0, black calc(100% - 48px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0, black calc(100% - 48px), transparent 100%);
+  }
+
+  /* ======================================================================
+     Job detail modal — premium popup, portaled into <body>
+     ====================================================================== */
+  .job-modal-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 5vh 1rem 1rem;
+    animation: modal-fade 0.18s ease-out both;
+  }
+  .job-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 50% at 50% 0%, rgba(212,175,55,0.28), transparent 70%),
+      rgba(31,41,51,0.35);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    cursor: pointer;
+  }
+  .job-modal-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 760px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 28px;
+    background: #FFFDF8;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(212,175,55,0.35),
+      0 30px 80px -20px rgba(212,175,55,0.55),
+      0 18px 44px -12px rgba(31,41,51,0.25);
+    animation: modal-pop 0.32s cubic-bezier(0.22,0.61,0.36,1) both;
+  }
+  .job-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    width: 38px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    color: #1F2933;
+    box-shadow: 0 6px 18px rgba(212,175,55,0.35), 0 0 0 1px rgba(212,175,55,0.35);
+    transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+  }
+  .job-modal-close:hover {
+    transform: rotate(90deg) scale(1.05);
+    background: #FFFFFF;
+    color: #996515;
+  }
+  .job-modal-header {
+    position: relative;
+    padding: 40px 56px 28px 32px;
+    background:
+      linear-gradient(135deg, #F6D27A 0%, #D4AF37 45%, #996515 100%);
+    background-size: 200% 200%;
+    animation: shimmer 8s linear infinite;
+    color: #2A1D05;
+    overflow: hidden;
+  }
+  .job-modal-header::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(80% 120% at 100% 0%, rgba(255,255,255,0.35), transparent 55%),
+      radial-gradient(60% 100% at 0% 100%, rgba(255,255,255,0.18), transparent 60%);
+    pointer-events: none;
+  }
+  .job-modal-header-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .job-modal-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.22);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    backdrop-filter: blur(6px);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+  }
+  .job-modal-title {
+    font-family: Fraunces, serif;
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: #FFFFFF;
+    text-shadow: 0 2px 12px rgba(120,80,10,0.35);
+  }
+  .job-modal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .job-modal-meta > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.88);
+    color: #5C3A06;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .job-modal-meta svg {
+    height: 12px;
+    width: 12px;
+    color: #996515;
+  }
+  .job-modal-platform {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px !important;
+  }
+  .job-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 28px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background:
+      linear-gradient(180deg, #FFFDF8 0%, #FAF7F0 100%);
+  }
+  .job-modal-section-title {
+    font-family: Fraunces, serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #996515;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .job-modal-section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(212,175,55,0.4), transparent);
+  }
+  .job-modal-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #FFFFFF;
+    color: #1F2933;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 0 0 1px rgba(212,175,55,0.45),
+                0 1px 3px rgba(212,175,55,0.15);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .job-modal-tag:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 0 0 1px rgba(212,175,55,0.75),
+                0 6px 14px rgba(212,175,55,0.22);
+  }
+  .job-modal-description {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #334155;
+    background: #FFFFFF;
+    padding: 20px 22px;
+    border-radius: 18px;
+    box-shadow: inset 0 0 0 1px #F1E5C4,
+                0 1px 2px rgba(212,175,55,0.08);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .job-modal-footer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 18px 32px;
+    background: #FFFFFF;
+    border-top: 1px solid #F1E5C4;
+  }
+  .job-modal-close-text {
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: transparent;
+    color: #64748B;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .job-modal-close-text:hover {
+    background: #FAF7F0;
+    color: #1F2933;
+  }
+  .job-modal-apply {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #F6D27A, #D4AF37 45%, #996515);
+    background-size: 200% 200%;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 10px 24px -6px rgba(212,175,55,0.55),
+                0 0 0 1px rgba(153,101,21,0.35);
+    animation: shimmer 3.5s linear infinite;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  }
+  .job-modal-apply:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+    box-shadow: 0 16px 34px -8px rgba(212,175,55,0.75),
+                0 0 0 1px rgba(153,101,21,0.5);
+  }
+  .job-modal-apply svg { transition: transform 0.18s ease; }
+  .job-modal-apply:hover svg { transform: translateX(3px); }
+
+  @keyframes modal-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes modal-pop {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
   }
 }

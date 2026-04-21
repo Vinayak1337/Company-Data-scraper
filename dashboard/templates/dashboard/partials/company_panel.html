@@ -1,50 +1,97 @@
-<div id="company-panel" class="rounded-lg border border-white/10 bg-panel/80 p-4 shadow-glow backdrop-blur">
-  <div class="flex items-center justify-between">
-    <h2 class="text-lg font-semibold text-white">Companies</h2>
-    <span class="rounded-full bg-brand/15 px-3 py-1 text-xs font-medium text-indigo-200">{{ companies|length }} tracked</span>
+{% load humanize %}
+<div id="company-panel" class="flex flex-col gap-5 w-full">
+  <div class="rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-goldSoft/60 text-goldDark ring-1 ring-gold/30">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-16 0H3m4-14h.01M7 11h.01M7 15h.01M11 7h.01M11 11h.01M11 15h.01M15 7h.01M15 11h.01M15 15h.01"/></svg>
+        </span>
+        <h2 style="font-family:Fraunces,serif" class="text-base font-bold text-charcoal tracking-tight">Companies</h2>
+      </div>
+      <span class="rounded-full bg-cream px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted ring-1 ring-warmLine">{{ companies|length }} tracked</span>
+    </div>
+
+    <form class="mt-4 space-y-2.5" hx-post="{% url 'add_company' %}" hx-target="#company-panel" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input name="name" class="h-9 w-full rounded-xl border-0 bg-cream/50 ring-1 ring-inset ring-warmLine px-3 text-xs text-charcoal outline-none placeholder:text-muted/70 focus:ring-2 focus:ring-inset focus:ring-gold focus:bg-paper transition" placeholder="Optional display name">
+      <div class="flex gap-2">
+        <input name="careers_url" type="url" required class="h-9 w-full rounded-xl border-0 bg-cream/50 ring-1 ring-inset ring-warmLine px-3 text-xs text-charcoal outline-none placeholder:text-muted/70 focus:ring-2 focus:ring-inset focus:ring-gold focus:bg-paper transition" placeholder="https://company.com/careers">
+        <button class="shrink-0 inline-flex items-center gap-1 rounded-xl bg-gold-metallic bg-[length:200%_100%] animate-shimmer ring-1 ring-goldSoft/50 px-3.5 text-xs font-bold text-white shadow-glow transition hover:brightness-110 hover:-translate-y-0.5">
+          <span class="htmx-indicator-hide">Add</span>
+          <span class="htmx-indicator h-3 w-3 rounded-full border-2 border-white/70 border-t-transparent animate-spin-slow"></span>
+        </button>
+      </div>
+    </form>
   </div>
 
-  <form class="mt-4 space-y-3" hx-post="{% url 'add_company' %}" hx-target="#company-panel" hx-swap="outerHTML">
-    {% csrf_token %}
-    <input name="name" class="w-full rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Company name optional">
-    <input name="careers_url" type="url" required class="w-full rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="https://jobs.lever.co/company">
-    <button class="w-full rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500">Add company</button>
-  </form>
+  <!-- Scrollable list with gold fade at bottom -->
+  <div class="relative">
+    <div class="max-h-[62vh] overflow-y-auto scroll-luxe pr-1 pb-10 space-y-3">
+      {% for company in companies %}
+        <article class="group relative rounded-xl bg-paper p-4 ring-1 ring-warmLine shadow-elev-1 hover:ring-gold/60 hover:shadow-elev-2 hover:-translate-y-0.5 transition duration-300">
+          <div class="flex flex-col gap-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <h3 class="truncate text-sm font-bold text-charcoal">{{ company.name }}</h3>
+                <p class="mt-0.5 truncate text-[10px] font-medium text-muted">{{ company.careers_url }}</p>
+              </div>
+              <!-- Scraper type badge, border colour shows scrape status -->
+              {% if company.last_scrape_status == "success" %}
+                <span class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">{{ company.scraper_type }}</span>
+              {% elif company.last_scrape_status == "failed" %}
+                <span class="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-600 ring-1 ring-red-200">{{ company.scraper_type }}</span>
+              {% else %}
+                <span class="shrink-0 rounded bg-cream px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted ring-1 ring-warmLine">{{ company.scraper_type }}</span>
+              {% endif %}
+            </div>
 
-  <div class="mt-5 space-y-3">
-    {% for company in companies %}
-      <article class="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <h3 class="truncate font-medium text-white">{{ company.name }}</h3>
-            <p class="mt-1 truncate text-xs text-slate-400">{{ company.careers_url }}</p>
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-warmLine/40">
+              <div class="flex flex-col">
+                <span class="text-sm font-bold">
+                  <span class="bg-gold-metallic bg-clip-text text-transparent">{{ company.job_count }}</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-muted"> jobs</span>
+                </span>
+                {% if company.last_scraped_at %}
+                  <span class="text-[10px] text-muted">{{ company.last_scraped_at|naturaltime }}</span>
+                {% else %}
+                  <span class="text-[10px] text-muted italic">Never scraped</span>
+                {% endif %}
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button class="inline-flex items-center gap-1 rounded-lg bg-gold-metallic bg-[length:200%_100%] animate-shimmer px-3 py-1.5 text-[11px] font-bold text-white shadow-glow transition hover:brightness-110 hover:-translate-y-0.5"
+                        hx-post="{% url 'scrape_company' company.id %}"
+                        hx-target="#dashboard-content"
+                        hx-swap="innerHTML"
+                        hx-include="#filter-form"
+                        hx-disabled-elt="this">
+                  <span class="htmx-indicator-hide">Scrape</span>
+                  <span class="htmx-indicator h-3 w-3 rounded-full border-2 border-white/70 border-t-transparent animate-spin-slow"></span>
+                </button>
+                <button class="inline-flex items-center justify-center h-7 w-7 rounded-lg ring-1 ring-inset ring-warmLine text-muted transition hover:ring-gold/60 hover:text-red-500"
+                        hx-post="{% url 'delete_company' company.id %}"
+                        hx-target="#company-panel"
+                        hx-swap="outerHTML"
+                        hx-include="#filter-form"
+                        hx-confirm="Remove {{ company.name }} and its jobs?"
+                        title="Remove">
+                  <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {% if company.last_scrape_message %}
+              <p class="line-clamp-2 text-[10px] text-muted italic leading-relaxed">{{ company.last_scrape_message }}</p>
+            {% endif %}
           </div>
-          <span class="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[11px] text-slate-300">{{ company.scraper_type }}</span>
+        </article>
+      {% empty %}
+        <div class="rounded-2xl border-2 border-dashed border-warmLine bg-paper/50 p-6 text-center text-xs text-muted">
+          <p class="font-semibold text-charcoal">No companies tracked yet</p>
+          <p class="mt-1">Paste a careers URL above to begin.</p>
         </div>
-        <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>{{ company.job_count }} jobs</span>
-          <span>{{ company.last_scrape_status }}</span>
-        </div>
-        {% if company.last_scrape_message %}
-          <p class="mt-2 line-clamp-2 text-xs text-slate-500">{{ company.last_scrape_message }}</p>
-        {% endif %}
-        <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
-          <button class="rounded-md bg-success px-3 py-2 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-400"
-                  hx-post="{% url 'scrape_company' company.id %}"
-                  hx-target="#dashboard-content"
-                  hx-swap="innerHTML">
-            Scrape
-          </button>
-          <button class="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/5"
-                  hx-post="{% url 'delete_company' company.id %}"
-                  hx-target="#company-panel"
-                  hx-swap="outerHTML">
-            Remove
-          </button>
-        </div>
-      </article>
-    {% empty %}
-      <div class="rounded-lg border border-dashed border-white/15 p-4 text-sm text-slate-400">No companies yet. Add a careers or ATS URL to start.</div>
-    {% endfor %}
+      {% endfor %}
+    </div>
+    <!-- Gold fade indicating overflow -->
+    <div class="pointer-events-none absolute bottom-0 inset-x-0 h-16 rounded-b-xl bg-gradient-to-t from-cream via-cream/70 to-transparent"></div>
   </div>
 </div>

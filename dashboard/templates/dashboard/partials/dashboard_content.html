@@ -1,16 +1,19 @@
-<div class="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
-  <aside>
+<div class="mt-6 grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
+  <!-- Filters Sidebar — always sticky, always scrolls independently -->
+  <aside class="min-w-0 sticky top-[72px] self-start max-h-[calc(100vh-88px)] overflow-y-auto scroll-luxe pl-1 pr-1 pt-2">
+    {% include "dashboard/partials/filter_bar.html" %}
+  </aside>
+
+  <!-- Main Jobs List -->
+  <section class="min-w-0 flex flex-col gap-6 pt-2">
+    <div id="job-detail"></div>
+    <div id="jobs-table">
+      {% include "dashboard/partials/jobs_table.html" %}
+    </div>
+  </section>
+
+  <!-- Companies / Management — always sticky, always scrolls independently -->
+  <aside class="min-w-0 sticky top-[72px] self-start max-h-[calc(100vh-88px)] overflow-y-auto scroll-luxe pr-1 pt-2">
     {% include "dashboard/partials/company_panel.html" %}
   </aside>
-  <section class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-    <div class="min-w-0 rounded-lg border border-white/10 bg-panel/80 shadow-glow backdrop-blur">
-      {% include "dashboard/partials/filter_bar.html" %}
-      <div id="jobs-table">
-        {% include "dashboard/partials/jobs_table.html" %}
-      </div>
-    </div>
-    <aside id="job-detail" class="min-h-[360px]">
-      {% include "dashboard/partials/job_detail.html" %}
-    </aside>
-  </section>
 </div>

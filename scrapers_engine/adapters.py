@@ -1,5 +1,6 @@
+import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from html import unescape
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -162,6 +163,53 @@ class AshbyScraper(BaseScraper):
         return ScrapeResult(self.source_platform, company_name, dedupe_jobs(jobs))
 
 
+class MicrosoftCareersScraper(BaseScraper):
+    source_platform = "microsoft"
+
+    def can_handle(self, url: str) -> bool:
+        return hostname(url) == "apply.careers.microsoft.com"
+
+    def scrape(self, url: str) -> ScrapeResult:
+        response = self.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        jobs = self.jobs_from_json_ld(soup, url)
+        if jobs:
+            return ScrapeResult(self.source_platform, "Microsoft", jobs)
+        return GenericScraper().scrape(url)
+
+    def jobs_from_json_ld(self, soup: BeautifulSoup, url: str) -> list[NormalizedJob]:
+        jobs = []
+        for script in soup.select("script[type='application/ld+json']"):
+            raw = script.string or script.get_text("", strip=True)
+            if not raw:
+                continue
+            for item in flatten_json_ld(raw):
+                if item.get("@type") != "JobPosting":
+                    continue
+                title = clean_text(item.get("title", ""))
+                description = html_to_text(item.get("description", ""))
+                company_name = json_ld_company_name(item) or "Microsoft"
+                location = json_ld_location(item)
+                apply_url = item.get("url") or url
+                text = f"{title} {location} {description}"
+                jobs.append(
+                    NormalizedJob(
+                        title=title,
+                        company_name=company_name,
+                        location=location,
+                        description=description,
+                        apply_url=apply_url,
+                        source_url=url,
+                        source_platform=self.source_platform,
+                        external_id=str(parse_qs(urlparse(apply_url).query).get("pid", [""])[0]),
+                        posted_at=parse_datetime(item.get("datePosted")),
+                        tags=self.infer_tags(text),
+                        remote_policy=self.infer_remote_policy(text),
+                    )
+                )
+        return dedupe_jobs([job for job in jobs if job.title and job.apply_url])
+
+
 class GenericScraper(BaseScraper):
     source_platform = "generic"
 
@@ -173,7 +221,7 @@ class GenericScraper(BaseScraper):
         soup = BeautifulSoup(response.text, "html.parser")
         title = soup.find("title")
         company_name = self.infer_company_name(url, title.get_text(" ", strip=True) if title else "")
-        jobs = []
+        jobs = self.jobs_from_json_ld(soup, url, company_name)
         selectors = [
             "a[href*='job']",
             "a[href*='career']",
@@ -206,6 +254,38 @@ class GenericScraper(BaseScraper):
             )
         return ScrapeResult(self.source_platform, company_name, dedupe_jobs(jobs))
 
+    def jobs_from_json_ld(self, soup: BeautifulSoup, url: str, fallback_company_name: str) -> list[NormalizedJob]:
+        jobs = []
+        for script in soup.select("script[type='application/ld+json']"):
+            raw = script.string or script.get_text("", strip=True)
+            if not raw:
+                continue
+            for item in flatten_json_ld(raw):
+                if item.get("@type") != "JobPosting":
+                    continue
+                title = clean_text(item.get("title", ""))
+                description = html_to_text(item.get("description", ""))
+                company_name = json_ld_company_name(item) or fallback_company_name
+                location = json_ld_location(item)
+                apply_url = item.get("url") or url
+                text = f"{title} {company_name} {location} {description}"
+                jobs.append(
+                    NormalizedJob(
+                        title=title,
+                        company_name=company_name,
+                        location=location,
+                        description=description,
+                        apply_url=apply_url,
+                        source_url=url,
+                        source_platform=self.source_platform,
+                        external_id=str(parse_qs(urlparse(apply_url).query).get("pid", [""])[0]),
+                        posted_at=parse_datetime(item.get("datePosted")),
+                        tags=self.infer_tags(text),
+                        remote_policy=self.infer_remote_policy(text),
+                    )
+                )
+        return jobs
+
 
 def greenhouse_board_token(url: str) -> str:
     parsed = urlparse(url)
@@ -235,15 +315,68 @@ def parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt_timezone.utc)
+    return parsed
 
 
 def parse_timestamp_ms(value: int | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromtimestamp(value / 1000)
+    return datetime.fromtimestamp(value / 1000, tz=dt_timezone.utc)
+
+
+def flatten_json_ld(raw: str) -> list[dict]:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(data, dict) and "@graph" in data:
+        data = data["@graph"]
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    return []
+
+
+def json_ld_company_name(item: dict) -> str:
+    organization = item.get("hiringOrganization") or {}
+    if isinstance(organization, dict):
+        return clean_text(organization.get("name", ""))
+    return ""
+
+
+def json_ld_location(item: dict) -> str:
+    locations = item.get("jobLocation") or []
+    if isinstance(locations, dict):
+        locations = [locations]
+    labels = []
+    for location in locations:
+        if not isinstance(location, dict):
+            continue
+        address = location.get("address") or {}
+        if not isinstance(address, dict):
+            continue
+        parts = [
+            address.get("addressLocality", ""),
+            address.get("addressRegion", ""),
+            country_name(address.get("addressCountry", "")),
+        ]
+        label = clean_text(", ".join(part for part in parts if part))
+        if label:
+            labels.append(label)
+    return " / ".join(labels)
+
+
+def country_name(value) -> str:
+    if isinstance(value, dict):
+        return clean_text(value.get("name", ""))
+    return clean_text(str(value or ""))
 
 
 def html_to_text(value: str) -> str:
@@ -283,4 +416,4 @@ def dedupe_jobs(jobs: list[NormalizedJob]) -> list[NormalizedJob]:
     return unique
 
 
-SCRAPERS = [GreenhouseScraper(), LeverScraper(), AshbyScraper()]
+SCRAPERS = [GreenhouseScraper(), LeverScraper(), AshbyScraper(), MicrosoftCareersScraper()]

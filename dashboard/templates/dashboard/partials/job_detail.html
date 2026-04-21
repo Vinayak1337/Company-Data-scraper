@@ -1,34 +1,107 @@
-<div class="rounded-lg border border-white/10 bg-panel/80 p-5 shadow-glow backdrop-blur">
-  {% if selected_job %}
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <p class="text-sm text-success">{{ selected_job.company.name }}</p>
-        <h2 class="mt-1 text-2xl font-semibold text-white">{{ selected_job.title }}</h2>
+{% load humanize %}
+{% if selected_job %}
+<div id="job-modal" class="job-modal-portal">
+
+  <!-- Backdrop: gold tint + heavy blur -->
+  <div class="job-modal-backdrop" onclick="closeJobModal()"></div>
+
+  <!-- Modal card -->
+  <div class="job-modal-card" role="dialog" aria-modal="true">
+
+    <!-- Close button floating top-right over header -->
+    <button type="button" onclick="closeJobModal()" aria-label="Close"
+            class="job-modal-close">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+
+    <!-- Gold shimmer header -->
+    <header class="job-modal-header">
+      <div class="job-modal-header-inner">
+        <span class="job-modal-eyebrow">
+          <span class="h-1.5 w-1.5 rounded-full bg-white/90"></span>
+          {{ selected_job.company.name }}
+        </span>
+        <h2 class="job-modal-title">{{ selected_job.title }}</h2>
+        <div class="job-modal-meta">
+          <span>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            {{ selected_job.location|default:"Anywhere" }}
+          </span>
+          <span class="capitalize">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+            {{ selected_job.remote_policy|default:"On-site" }}
+          </span>
+          {% if selected_job.posted_at %}
+          <span>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {{ selected_job.posted_at|naturaltime }}
+          </span>
+          {% endif %}
+          <span class="job-modal-platform">{{ selected_job.source_platform }}</span>
+        </div>
       </div>
-      <span class="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">{{ selected_job.source_platform }}</span>
+    </header>
+
+    <!-- Scrollable body -->
+    <div class="job-modal-body scroll-luxe">
+      {% if selected_job.tags %}
+      <section>
+        <h3 class="job-modal-section-title">Tech stack</h3>
+        <div class="flex flex-wrap gap-2">
+          {% for tag in selected_job.tags %}
+            <span class="job-modal-tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      <section>
+        <h3 class="job-modal-section-title">About this role</h3>
+        <div class="job-modal-description">
+          {{ selected_job.description|default:"No description was extracted for this posting."|linebreaksbr }}
+        </div>
+      </section>
     </div>
-    <dl class="mt-5 grid grid-cols-2 gap-3 text-sm">
-      <div class="rounded-md bg-white/[0.04] p-3">
-        <dt class="text-xs uppercase tracking-wide text-slate-500">Location</dt>
-        <dd class="mt-1 text-slate-200">{{ selected_job.location|default:"Unknown" }}</dd>
-      </div>
-      <div class="rounded-md bg-white/[0.04] p-3">
-        <dt class="text-xs uppercase tracking-wide text-slate-500">Work mode</dt>
-        <dd class="mt-1 text-slate-200">{{ selected_job.remote_policy }}</dd>
-      </div>
-    </dl>
-    <div class="mt-4 flex flex-wrap gap-2">
-      {% for tag in selected_job.tags %}
-        <span class="rounded-full bg-brand/15 px-3 py-1 text-xs text-indigo-200">{{ tag }}</span>
-      {% endfor %}
-    </div>
-    <div class="mt-5 max-h-[360px] overflow-auto rounded-md border border-white/10 bg-ink p-4 text-sm leading-6 text-slate-300">
-      {{ selected_job.description|default:"No description was extracted for this job." }}
-    </div>
-    <a href="{{ selected_job.apply_url }}" target="_blank" rel="noreferrer" class="mt-5 block rounded-md bg-brand px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-indigo-500">Open application</a>
-  {% else %}
-    <div class="flex min-h-[320px] items-center justify-center rounded-md border border-dashed border-white/15 p-8 text-center text-slate-400">
-      Select a job to view details.
-    </div>
-  {% endif %}
+
+    <!-- Footer with Apply CTA -->
+    <footer class="job-modal-footer">
+      <button type="button" onclick="closeJobModal()" class="job-modal-close-text">
+        Close
+      </button>
+      <a href="{{ selected_job.apply_url }}" target="_blank" rel="noreferrer" class="job-modal-apply">
+        <span>Apply Now</span>
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+      </a>
+    </footer>
+
+  </div>
 </div>
+
+<script>
+  // Portal the modal to document.body so fixed positioning is never trapped by a parent
+  (function () {
+    var modal = document.getElementById("job-modal");
+    if (modal && modal.parentElement && modal.parentElement.id !== "job-modal-wrapper") {
+      var wrapper = document.getElementById("job-modal-wrapper");
+      if (!wrapper) {
+        wrapper = document.createElement("div");
+        wrapper.id = "job-modal-wrapper";
+        document.body.appendChild(wrapper);
+      }
+      wrapper.innerHTML = "";
+      wrapper.appendChild(modal);
+      document.body.style.overflow = "hidden";
+    }
+  })();
+
+  window.closeJobModal = function () {
+    var wrapper = document.getElementById("job-modal-wrapper");
+    if (wrapper) wrapper.innerHTML = "";
+    var stub = document.getElementById("job-detail");
+    if (stub) stub.innerHTML = "";
+    document.body.style.overflow = "";
+  };
+</script>
+{% endif %}

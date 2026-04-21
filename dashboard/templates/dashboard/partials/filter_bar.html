@@ -1,27 +1,129 @@
-<form class="border-b border-white/10 p-4"
+<form id="filter-form" class="flex flex-col gap-4 w-full"
       hx-get="{% url 'jobs_partial' %}"
       hx-target="#jobs-table"
-      hx-trigger="input changed delay:250ms, change">
-  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-    <input name="q" value="{{ filters.q }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2 xl:col-span-2" placeholder="Search title, company, description">
-    <input name="title" value="{{ filters.title }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Title">
-    <input name="location" value="{{ filters.location }}" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 placeholder:text-slate-500 focus:ring-2" placeholder="Location">
-    <select name="company" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 focus:ring-2">
-      <option value="">All companies</option>
-      {% for company in companies %}
-        <option value="{{ company.id }}" {% if filters.company == company.id|stringformat:"s" %}selected{% endif %}>{{ company.name }}</option>
+      hx-trigger="input changed delay:250ms, change, submit">
+
+  <!-- Search & Title -->
+  <div class="rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 style="font-family:Fraunces,serif" class="text-sm font-bold text-charcoal tracking-tight">Filters</h2>
+      <a href="{% url 'dashboard' %}" class="text-[11px] font-semibold text-muted hover:text-goldDark transition">Clear all</a>
+    </div>
+
+    <label class="block">
+      <span class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.13em] text-muted">Search</span>
+      <div class="relative">
+        <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+        <input name="q" value="{{ filters.q }}" class="h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine pl-9 pr-3 text-sm text-charcoal outline-none placeholder:text-muted/60 hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:shadow-glow focus:bg-paper transition" placeholder="Keywords, role, company…">
+      </div>
+    </label>
+
+    <label class="mt-3 block">
+      <span class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.13em] text-muted">Job title</span>
+      <input name="title" value="{{ filters.title }}" class="h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine px-3 text-sm text-charcoal outline-none placeholder:text-muted/60 hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:shadow-glow focus:bg-paper transition" placeholder="e.g. Backend Engineer">
+    </label>
+  </div>
+
+  <!-- Location -->
+  <details open class="group rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5">
+    <summary class="flex cursor-pointer list-none items-center justify-between select-none">
+      <span class="text-[10px] font-bold uppercase tracking-[0.13em] text-charcoal">Location</span>
+      <svg class="h-4 w-4 text-muted/70 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+
+    <div class="mt-4 space-y-3">
+      <!-- Scope toggle -->
+      <div class="grid grid-cols-2 gap-2">
+        <label class="cursor-pointer">
+          <input type="radio" name="country" value="India" class="peer hidden" {% if filters.country == "India" %}checked{% endif %}>
+          <span class="flex h-9 items-center justify-center rounded-xl ring-1 ring-inset ring-warmLine text-xs font-bold text-muted transition hover:ring-gold/60 hover:text-charcoal peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">India</span>
+        </label>
+        <label class="cursor-pointer">
+          <input type="radio" name="country" value="global" class="peer hidden" {% if filters.country == "global" %}checked{% endif %}>
+          <span class="flex h-9 items-center justify-center rounded-xl ring-1 ring-inset ring-warmLine text-xs font-bold text-muted transition hover:ring-gold/60 hover:text-charcoal peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">Global</span>
+        </label>
+      </div>
+
+      <label class="block">
+        <span class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">State</span>
+        <select name="state" class="appearance-none h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine px-3 pr-8 text-sm text-charcoal outline-none bg-no-repeat transition hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:bg-paper bg-[url('data:image/svg+xml;utf8,<svg fill=\"%23D4AF37\" viewBox=\"0 0 20 20\" xmlns=\"http://www.w3.org/2000/svg\"><path fill-rule=\"evenodd\" d=\"M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z\" clip-rule=\"evenodd\"></path></svg>')] bg-[position:right_0.5rem_center] bg-[length:1.25rem]">
+          {% for value,label in india_states %}<option value="{{ value }}" {% if filters.state == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">City</span>
+        <select name="city" class="appearance-none h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine px-3 pr-8 text-sm text-charcoal outline-none bg-no-repeat transition hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:bg-paper bg-[url('data:image/svg+xml;utf8,<svg fill=\"%23D4AF37\" viewBox=\"0 0 20 20\" xmlns=\"http://www.w3.org/2000/svg\"><path fill-rule=\"evenodd\" d=\"M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z\" clip-rule=\"evenodd\"></path></svg>')] bg-[position:right_0.5rem_center] bg-[length:1.25rem]">
+          {% for value,label in india_cities %}<option value="{{ value }}" {% if filters.city == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">Free text</span>
+        <input name="location" value="{{ filters.location }}" class="h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine px-3 text-sm text-charcoal outline-none placeholder:text-muted/60 hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:bg-paper transition" placeholder="Any location text…">
+      </label>
+    </div>
+  </details>
+
+  <!-- Employment -->
+  <details open class="group rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5">
+    <summary class="flex cursor-pointer list-none items-center justify-between select-none">
+      <span class="text-[10px] font-bold uppercase tracking-[0.13em] text-charcoal">Employment</span>
+      <svg class="h-4 w-4 text-muted/70 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="mt-4 space-y-3">
+      <label class="block">
+        <span class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">Company</span>
+        <select name="company" class="appearance-none h-10 w-full rounded-xl border-0 bg-cream/60 ring-1 ring-inset ring-warmLine px-3 pr-8 text-sm text-charcoal outline-none bg-no-repeat transition hover:ring-gold/50 focus:ring-2 focus:ring-gold focus:bg-paper bg-[url('data:image/svg+xml;utf8,<svg fill=\"%23D4AF37\" viewBox=\"0 0 20 20\" xmlns=\"http://www.w3.org/2000/svg\"><path fill-rule=\"evenodd\" d=\"M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z\" clip-rule=\"evenodd\"></path></svg>')] bg-[position:right_0.5rem_center] bg-[length:1.25rem]">
+          <option value="">All companies</option>
+          {% for company in companies %}<option value="{{ company.id }}" {% if filters.company == company.id|stringformat:"s" %}selected{% endif %}>{{ company.name }}</option>{% endfor %}
+        </select>
+      </label>
+
+      <div>
+        <span class="mb-2 block text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">Work mode</span>
+        <div class="grid grid-cols-4 gap-1.5">
+          <label class="cursor-pointer">
+            <input type="radio" name="remote" value="" class="peer hidden" {% if not filters.remote %}checked{% endif %}>
+            <span class="flex h-8 items-center justify-center rounded-lg ring-1 ring-inset ring-warmLine text-[11px] font-bold text-muted transition hover:ring-gold/60 peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">Any</span>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="remote" value="remote" class="peer hidden" {% if filters.remote == "remote" %}checked{% endif %}>
+            <span class="flex h-8 items-center justify-center rounded-lg ring-1 ring-inset ring-warmLine text-[11px] font-bold text-muted transition hover:ring-gold/60 peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">Remote</span>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="remote" value="hybrid" class="peer hidden" {% if filters.remote == "hybrid" %}checked{% endif %}>
+            <span class="flex h-8 items-center justify-center rounded-lg ring-1 ring-inset ring-warmLine text-[11px] font-bold text-muted transition hover:ring-gold/60 peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">Hybrid</span>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="remote" value="onsite" class="peer hidden" {% if filters.remote == "onsite" %}checked{% endif %}>
+            <span class="flex h-8 items-center justify-center rounded-lg ring-1 ring-inset ring-warmLine text-[11px] font-bold text-muted transition hover:ring-gold/60 peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">Onsite</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- Tech Stack -->
+  <details open class="group rounded-2xl bg-paper ring-1 ring-warmLine shadow-elev-1 p-5">
+    <summary class="flex cursor-pointer list-none items-center justify-between select-none">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-bold uppercase tracking-[0.13em] text-charcoal">Tech stack</span>
+        {% if filters.tech %}<span class="rounded-full bg-goldSoft px-2 py-0.5 text-[10px] font-bold text-goldDark ring-1 ring-gold/30">{{ filters.tech }}</span>{% endif %}
+      </div>
+      <svg class="h-4 w-4 text-muted/70 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="mt-4 flex flex-wrap gap-1.5">
+      <label class="cursor-pointer">
+        <input type="radio" name="tech" value="" class="peer hidden" {% if not filters.tech %}checked{% endif %}>
+        <span class="inline-block rounded-full px-3 py-1 text-[11px] font-semibold transition ring-1 ring-inset ring-warmLine text-muted hover:ring-gold/60 hover:text-charcoal peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">All</span>
+      </label>
+      {% for tag in tags %}
+      <label class="cursor-pointer">
+        <input type="radio" name="tech" value="{{ tag }}" class="peer hidden" {% if filters.tech == tag %}checked{% endif %}>
+        <span class="inline-block rounded-full px-3 py-1 text-[11px] font-semibold transition ring-1 ring-inset ring-warmLine text-muted hover:ring-gold/60 hover:text-charcoal peer-checked:bg-gold-metallic peer-checked:bg-[length:200%_100%] peer-checked:animate-shimmer peer-checked:ring-0 peer-checked:text-white peer-checked:shadow-glow">{{ tag }}</span>
+      </label>
       {% endfor %}
-    </select>
-    <select name="remote" class="rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none ring-brand/60 focus:ring-2">
-      <option value="">Any mode</option>
-      <option value="remote" {% if filters.remote == "remote" %}selected{% endif %}>Remote</option>
-      <option value="hybrid" {% if filters.remote == "hybrid" %}selected{% endif %}>Hybrid</option>
-      <option value="onsite" {% if filters.remote == "onsite" %}selected{% endif %}>Onsite</option>
-    </select>
-  </div>
-  <div class="mt-3 flex flex-wrap gap-2">
-    {% for tag in tags %}
-      <button name="tech" value="{{ tag }}" class="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:border-brand hover:text-white">{{ tag }}</button>
-    {% endfor %}
-  </div>
+    </div>
+  </details>
 </form>

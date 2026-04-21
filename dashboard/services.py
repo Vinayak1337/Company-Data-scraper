@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -5,6 +7,47 @@ from django.utils import timezone
 from companies.models import Company, ScrapeLog
 from jobs.models import Job
 from scrapers_engine import detect_scraper, scrape
+
+
+INDIA_STATE_CHOICES = [
+    ("", "All states"),
+    ("Andhra Pradesh", "Andhra Pradesh"),
+    ("Delhi", "Delhi NCR"),
+    ("Gujarat", "Gujarat"),
+    ("Haryana", "Haryana"),
+    ("Karnataka", "Karnataka"),
+    ("Maharashtra", "Maharashtra"),
+    ("Tamil Nadu", "Tamil Nadu"),
+    ("Telangana", "Telangana"),
+    ("Uttar Pradesh", "Uttar Pradesh"),
+    ("West Bengal", "West Bengal"),
+]
+
+INDIA_CITY_CHOICES = [
+    ("", "All cities"),
+    ("Bengaluru", "Bengaluru"),
+    ("Bangalore", "Bangalore"),
+    ("Chennai", "Chennai"),
+    ("Delhi", "Delhi"),
+    ("Gurugram", "Gurugram"),
+    ("Gurgaon", "Gurgaon"),
+    ("Hyderabad", "Hyderabad"),
+    ("Mumbai", "Mumbai"),
+    ("Noida", "Noida"),
+    ("Pune", "Pune"),
+    ("Kolkata", "Kolkata"),
+]
+
+INDIA_STATE_ALIASES = {
+    "Delhi": ["Delhi", "New Delhi", "DL,IN", "DL, IN"],
+    "Haryana": ["Haryana", "HR,IN", "HR, IN", "Gurugram", "Gurgaon"],
+    "Karnataka": ["Karnataka", "KA,IN", "KA, IN", "Bengaluru", "Bangalore"],
+    "Maharashtra": ["Maharashtra", "MH,IN", "MH, IN", "Mumbai", "Pune"],
+    "Tamil Nadu": ["Tamil Nadu", "TN,IN", "TN, IN", "Chennai"],
+    "Telangana": ["Telangana", "TS,IN", "TS, IN", "Hyderabad"],
+    "Uttar Pradesh": ["Uttar Pradesh", "UP,IN", "UP, IN", "Noida"],
+    "West Bengal": ["West Bengal", "WB,IN", "WB, IN", "Kolkata"],
+}
 
 
 def create_company_from_url(url: str, name: str = "") -> Company:
@@ -74,12 +117,16 @@ def upsert_job(company: Company, item) -> tuple[Job, bool]:
 
 def filter_jobs(params):
     jobs = Job.objects.select_related("company").all()
-    query = params.get("q", "").strip()
-    title = params.get("title", "").strip()
-    company_id = params.get("company", "").strip()
-    location = params.get("location", "").strip()
-    tech = params.get("tech", "").strip().lower()
-    remote = params.get("remote", "").strip()
+    filters = normalized_filters(params)
+    query = filters["q"]
+    title = filters["title"]
+    company_id = filters["company"]
+    location = filters["location"]
+    country = filters["country"]
+    state = filters["state"]
+    city = filters["city"]
+    tech = filters["tech"].lower()
+    remote = filters["remote"]
 
     if query:
         jobs = jobs.filter(
@@ -92,6 +139,12 @@ def filter_jobs(params):
         jobs = jobs.filter(title__icontains=title)
     if company_id:
         jobs = jobs.filter(company_id=company_id)
+    if country == "India":
+        jobs = jobs.filter(india_location_q())
+    if state:
+        jobs = jobs.filter(location_alias_q(INDIA_STATE_ALIASES.get(state, [state])))
+    if city:
+        jobs = jobs.filter(location_alias_q([city]))
     if location:
         jobs = jobs.filter(location__icontains=location)
     if tech:
@@ -99,6 +152,38 @@ def filter_jobs(params):
     if remote:
         jobs = jobs.filter(remote_policy=remote)
     return jobs
+
+
+def normalized_filters(params) -> dict:
+    return {
+        "q": params.get("q", "").strip(),
+        "title": params.get("title", "").strip(),
+        "company": params.get("company", "").strip(),
+        "country": params.get("country", "India").strip() or "India",
+        "state": params.get("state", "").strip(),
+        "city": params.get("city", "").strip(),
+        "location": params.get("location", "").strip(),
+        "tech": params.get("tech", "").strip(),
+        "remote": params.get("remote", "").strip(),
+    }
+
+
+def india_location_q() -> Q:
+    return (
+        Q(location__icontains="India")
+        | Q(location__icontains=", IN")
+        | Q(location__icontains=",IN")
+        | Q(location__icontains=" IN,")
+        | Q(location__iendswith=" IN")
+        | Q(location__iendswith=",IN")
+    )
+
+
+def location_alias_q(aliases: list[str]) -> Q:
+    query = Q()
+    for alias in aliases:
+        query |= Q(location__icontains=alias)
+    return query
 
 
 def dashboard_stats() -> dict:
@@ -112,14 +197,25 @@ def dashboard_stats() -> dict:
 
 
 def tag_cloud() -> list[str]:
-    tags = []
+    counter: Counter[str] = Counter()
     for row in Job.objects.exclude(tags=[]).values_list("tags", flat=True):
-        tags.extend(row)
-    return sorted(set(tags))[:40]
+        counter.update(row)
+    return [tag for tag, _ in counter.most_common(40)]
 
 
 def company_counts():
     return Company.objects.annotate(job_count=Count("jobs")).order_by("name")
+
+
+def reset_all_jobs() -> dict:
+    deleted_jobs, _ = Job.objects.all().delete()
+    deleted_logs, _ = ScrapeLog.objects.all().delete()
+    Company.objects.update(
+        last_scraped_at=None,
+        last_scrape_status="never",
+        last_scrape_message="",
+    )
+    return {"jobs": deleted_jobs, "logs": deleted_logs}
 
 
 def infer_name_from_url(url: str) -> str:

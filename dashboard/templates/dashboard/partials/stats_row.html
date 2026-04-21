@@ -1,0 +1,68 @@
+{% load humanize %}
+<section class="grid grid-cols-2 gap-4 md:grid-cols-4">
+  <article class="stat-card animate-fade-in-up" style="animation-delay:0ms">
+    <div class="relative flex items-start justify-between">
+      <div>
+        <p class="stat-label">Total Jobs</p>
+        <p class="mt-2 stat-number bg-gold-metallic bg-clip-text text-transparent">{{ stats.total_jobs }}</p>
+      </div>
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-goldSoft/50 text-goldDark ring-1 ring-gold/30">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </span>
+    </div>
+    <p class="relative mt-3 text-[11px] font-semibold text-muted">{{ visible_count }} matching current filters</p>
+  </article>
+
+  <article class="stat-card animate-fade-in-up" style="animation-delay:60ms">
+    <div class="relative flex items-start justify-between">
+      <div>
+        <p class="stat-label">Companies</p>
+        <p class="mt-2 stat-number">{{ stats.active_companies }}</p>
+      </div>
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-goldSoft/50 text-goldDark ring-1 ring-gold/30">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-16 0H3m4-14h.01M7 11h.01M7 15h.01M11 7h.01M11 11h.01M11 15h.01M15 7h.01M15 11h.01M15 15h.01"/></svg>
+      </span>
+    </div>
+    <p class="relative mt-3 text-[11px] font-semibold text-muted">Tracked career pages</p>
+  </article>
+
+  <article class="stat-card animate-fade-in-up" style="animation-delay:120ms">
+    <div class="relative flex items-start justify-between">
+      <div>
+        <p class="stat-label">Jobs Today</p>
+        <p class="mt-2 stat-number">{{ stats.jobs_today }}</p>
+      </div>
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-goldSoft/50 text-goldDark ring-1 ring-gold/30">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </span>
+    </div>
+    <p class="relative mt-3 text-[11px] font-semibold text-muted">Newly discovered postings</p>
+  </article>
+
+  <article class="stat-card animate-fade-in-up" style="animation-delay:180ms">
+    <div class="relative flex items-start justify-between">
+      <div>
+        <p class="stat-label">Last Scrape</p>
+        {% if stats.last_log %}
+          <p class="mt-2 text-lg font-bold text-charcoal leading-tight truncate max-w-[160px]">{{ stats.last_log.company.name }}</p>
+          <p class="text-[11px] font-semibold text-muted mt-0.5">{{ stats.last_log.started_at|naturaltime }}</p>
+        {% else %}
+          <p class="mt-2 text-lg font-bold text-muted">Never</p>
+        {% endif %}
+      </div>
+      {% if stats.last_log.status == "success" %}
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">
+          <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-soft"></span>
+        </span>
+      {% elif stats.last_log.status == "failed" %}
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-200">
+          <span class="h-2 w-2 rounded-full bg-red-500"></span>
+        </span>
+      {% else %}
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-goldSoft/40 text-goldDark ring-1 ring-gold/30">
+          <span class="h-2 w-2 rounded-full bg-gold"></span>
+        </span>
+      {% endif %}
+    </div>
+  </article>
+</section>

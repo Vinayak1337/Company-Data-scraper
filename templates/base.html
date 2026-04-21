@@ -4,7 +4,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Job Scout</title>
+    <title>Job Scout — Premium Careers Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
     <script>
@@ -14,10 +17,44 @@
           event.detail.headers["X-CSRFToken"] = decodeURIComponent(token.split("=")[1]);
         }
       });
+
+      // Toast system — listens for HX-Trigger: {"toast": {"type":"success","msg":"..."}}
+      document.body && document.body.addEventListener && (function () {
+        function showToast(detail) {
+          if (!detail || !detail.msg) return;
+          var root = document.getElementById("toast-root");
+          if (!root) {
+            root = document.createElement("div");
+            root.id = "toast-root";
+            document.body.appendChild(root);
+          }
+          var el = document.createElement("div");
+          el.className = "toast toast-" + (detail.type || "success");
+          el.innerHTML = '<span class="toast-dot"></span><span class="toast-msg"></span>';
+          el.querySelector(".toast-msg").textContent = detail.msg;
+          root.appendChild(el);
+          setTimeout(function () {
+            el.style.transition = "opacity 240ms ease, transform 240ms ease";
+            el.style.opacity = "0";
+            el.style.transform = "translateY(-8px)";
+            setTimeout(function () { el.remove(); }, 280);
+          }, 3200);
+        }
+        window.addEventListener("DOMContentLoaded", function () {
+          document.body.addEventListener("toast", function (e) { showToast(e.detail); });
+          // Close job-detail modal on Escape
+          document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") {
+              var el = document.getElementById("job-detail");
+              if (el) el.innerHTML = "";
+            }
+          });
+        });
+      })();
     </script>
   </head>
-  <body class="min-h-screen bg-ink text-slate-100 antialiased">
-    <div class="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),transparent_34%),linear-gradient(135deg,#0B0F19_0%,#111827_50%,#07111F_100%)]"></div>
+  <body class="min-h-screen bg-cream text-charcoal antialiased">
+    <div id="toast-root"></div>
     {% block content %}{% endblock %}
   </body>
 </html>

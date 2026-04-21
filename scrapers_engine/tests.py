@@ -9,6 +9,7 @@ class ScraperDetectionTests(SimpleTestCase):
         self.assertEqual(detect_scraper("https://boards.greenhouse.io/acme"), "greenhouse")
         self.assertEqual(detect_scraper("https://jobs.lever.co/acme"), "lever")
         self.assertEqual(detect_scraper("https://jobs.ashbyhq.com/acme"), "ashby")
+        self.assertEqual(detect_scraper("https://apply.careers.microsoft.com/careers?pid=123"), "microsoft")
         self.assertEqual(detect_scraper("https://example.com/careers"), "generic")
 
     def test_generic_remote_policy(self):

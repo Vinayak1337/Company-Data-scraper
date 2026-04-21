@@ -7,6 +7,7 @@ class Company(models.Model):
         ("greenhouse", "Greenhouse"),
         ("lever", "Lever"),
         ("ashby", "Ashby"),
+        ("microsoft", "Microsoft Careers"),
         ("generic", "Generic HTML"),
         ("unknown", "Unknown"),
     ]

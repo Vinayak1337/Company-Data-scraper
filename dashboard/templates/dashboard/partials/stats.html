@@ -1,18 +1,18 @@
-<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-  <div class="text-2xl font-semibold text-white">{{ stats.total_jobs }}</div>
-  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Jobs</div>
+<div class="rounded-md border border-warmLine bg-cream px-3 py-3">
+  <div class="text-xl font-semibold text-charcoal">{{ stats.total_jobs }}</div>
+  <div class="mt-1 text-xs font-medium uppercase tracking-wide text-muted">Jobs</div>
 </div>
-<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-  <div class="text-2xl font-semibold text-white">{{ stats.active_companies }}</div>
-  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Companies</div>
+<div class="rounded-md border border-warmLine bg-cream px-3 py-3">
+  <div class="text-xl font-semibold text-charcoal">{{ stats.active_companies }}</div>
+  <div class="mt-1 text-xs font-medium uppercase tracking-wide text-muted">Companies</div>
 </div>
-<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-  <div class="text-2xl font-semibold text-white">{{ stats.jobs_today }}</div>
-  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Today</div>
+<div class="rounded-md border border-warmLine bg-cream px-3 py-3">
+  <div class="text-xl font-semibold text-charcoal">{{ stats.jobs_today }}</div>
+  <div class="mt-1 text-xs font-medium uppercase tracking-wide text-muted">Today</div>
 </div>
-<div class="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-  <div class="truncate text-sm font-semibold text-white">
+<div class="rounded-md border border-warmLine bg-cream px-3 py-3">
+  <div class="truncate text-sm font-semibold text-charcoal">
     {% if stats.last_log %}{{ stats.last_log.get_status_display }}{% else %}Idle{% endif %}
   </div>
-  <div class="mt-1 text-xs uppercase tracking-wide text-slate-400">Last scrape</div>
+  <div class="mt-1 text-xs font-medium uppercase tracking-wide text-muted">Last scrape</div>
 </div>
