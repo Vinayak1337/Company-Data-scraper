@@ -77,6 +77,7 @@ def database_from_url(url: str) -> dict:
         "HOST": parsed.hostname or "",
         "PORT": parsed.port or "",
         "OPTIONS": {"sslmode": "require"},
+        "CONN_MAX_AGE": 60,
     }
 
 

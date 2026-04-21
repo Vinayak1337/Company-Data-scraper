@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: ./build.sh
     startCommand: gunicorn jobhunt.wsgi:application
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7

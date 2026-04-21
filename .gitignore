@@ -10,3 +10,4 @@ staticfiles/
 dist/
 .coverage
 htmlcov/
+.claude

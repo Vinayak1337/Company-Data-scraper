@@ -361,4 +361,78 @@
     from { opacity: 0; transform: translateY(16px) scale(0.97); }
     to   { opacity: 1; transform: translateY(0)    scale(1); }
   }
+
+  /* ======================================================================
+     Dark mode overrides
+     ====================================================================== */
+  .dark body {
+    background-color: #1A1A1A;
+    background-image:
+      radial-gradient(1100px 520px at 90% -10%, rgba(201,168,76,0.15), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(44,74,124,0.2), transparent 60%);
+    color: #F0EDE8;
+  }
+
+  .dark .stat-card {
+    background: #2A2A2A;
+    --tw-ring-color: #383838;
+  }
+  .dark .stat-card::before {
+    background: linear-gradient(135deg, rgba(201,168,76,0.12), transparent 60%);
+  }
+  .dark .stat-number { color: #F0EDE8; }
+  .dark .stat-label  { color: #8A8A8A; }
+
+  .dark .chip {
+    background: rgba(42,42,42,0.8);
+    color: #F0EDE8;
+    --tw-ring-color: #383838;
+  }
+
+  .dark .toast {
+    background: #2A2A2A;
+    color: #F0EDE8;
+    border-color: #383838;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .dark .toast.toast-error { color: #FCA5A5; }
+
+  .dark .job-modal-card {
+    background: #1E1E1E;
+    box-shadow:
+      0 0 0 1px rgba(201,168,76,0.3),
+      0 30px 80px -20px rgba(201,168,76,0.4),
+      0 18px 44px -12px rgba(0,0,0,0.6);
+  }
+  .dark .job-modal-body {
+    background: linear-gradient(180deg, #1E1E1E 0%, #1A1A1A 100%);
+  }
+  .dark .job-modal-section-title { color: #C9A84C; }
+  .dark .job-modal-tag {
+    background: #2A2A2A;
+    color: #F0EDE8;
+    box-shadow: inset 0 0 0 1px rgba(201,168,76,0.4),
+                0 1px 3px rgba(201,168,76,0.1);
+  }
+  .dark .job-modal-tag:hover {
+    box-shadow: inset 0 0 0 1px rgba(201,168,76,0.7),
+                0 6px 14px rgba(201,168,76,0.18);
+  }
+  .dark .job-modal-description {
+    background: #242424;
+    color: #D0CCC6;
+    box-shadow: inset 0 0 0 1px #383838;
+  }
+  .dark .job-modal-close {
+    background: rgba(42,42,42,0.95);
+    color: #F0EDE8;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 1px rgba(201,168,76,0.3);
+  }
+  .dark .job-modal-close:hover { background: #2A2A2A; color: #C9A84C; }
+  .dark .job-modal-footer {
+    background: #242424;
+    border-top-color: #383838;
+  }
+  .dark .job-modal-close-text { color: #8A8A8A; }
+  .dark .job-modal-close-text:hover { background: #2A2A2A; color: #F0EDE8; }
 }
