@@ -1,14 +1,15 @@
+import csv
 from dataclasses import dataclass
 from datetime import timedelta
 import ipaddress
+from io import StringIO
 from urllib.parse import urlsplit
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from companies.models import Company, JobAlert, ScanJob, ScrapeLog
+from companies.models import Company, CompanyJobSource, JobAlert, ScanJob, ScrapeLog
 from jobs.models import Job
-from notifications.mteane import publish_mteane_event
 from scrapers_engine import detect_scraper, scrape
 
 
@@ -31,6 +32,7 @@ WORK_MODE_ALIASES = {
     "wfh": "remote",
     "work from home": "remote",
 }
+SOURCE_PATH_CANDIDATES = ("careers", "jobs", "open-roles", "openings", "join-us")
 
 
 class ScanAlreadyRunning(ValueError):
@@ -46,34 +48,70 @@ class ScheduledScanSummary:
     scan_jobs: tuple[ScanJob, ...] = ()
 
 
-def create_company_from_url(url: str, name: str = "", priority_tier: str = "", filters: dict | None = None) -> Company:
-    url = validate_public_careers_url(url)
-    if not url:
-        raise ValueError("careers_url is required")
-    priority_tier = normalize_priority_tier(priority_tier)
-    filter_updates = normalize_company_filter_updates(filters or {})
-    scraper_type = detect_scraper(url)
-    display_name = name.strip() or infer_name_from_url(url)
-    defaults = {"name": display_name, "scraper_type": scraper_type}
-    if priority_tier:
-        defaults["priority_tier"] = priority_tier
-    defaults.update(filter_updates)
-    company, created = Company.objects.get_or_create(careers_url=url, defaults=defaults)
-    update_fields = []
-    if not created and company.scraper_type in {"unknown", ""}:
-        company.scraper_type = scraper_type
-        update_fields.append("scraper_type")
-    if not created and priority_tier and company.priority_tier != priority_tier:
-        company.priority_tier = priority_tier
-        update_fields.append("priority_tier")
+def create_company(payload: dict) -> Company:
+    name = str(payload.get("name") or payload.get("company") or "").strip()
+    careers_url = str(payload.get("careers_url") or "").strip()
+    homepage_url = str(payload.get("homepage_url") or payload.get("domain") or "").strip()
+    domain = normalize_domain(payload.get("domain") or homepage_url or careers_url)
+    priority_tier = normalize_priority_tier(payload.get("priority_tier") or payload.get("priority"))
+    is_active = coerce_bool(payload.get("is_active", payload.get("active", True)))
+    notes = str(payload.get("notes") or "").strip()
+    filter_updates = normalize_company_filter_updates(payload)
+
+    if careers_url:
+        careers_url = validate_public_careers_url(careers_url)
+    if homepage_url:
+        homepage_url = normalize_homepage_url(homepage_url)
+    if not name:
+        name = infer_name_from_url(careers_url or homepage_url or domain)
+    if not name:
+        raise ValueError("company name is required")
+
+    lookup = {}
+    if careers_url:
+        lookup["careers_url"] = careers_url
+    elif domain:
+        lookup["domain"] = domain
+    else:
+        lookup["name"] = name[:180]
+
+    defaults = {
+        "name": name[:180],
+        "domain": domain[:180],
+        "homepage_url": homepage_url,
+        "careers_url": careers_url,
+        "priority_tier": priority_tier,
+        "is_active": is_active,
+        "notes": notes,
+        "source_health": "needs_source",
+        **filter_updates,
+    }
+    if careers_url:
+        defaults["scraper_type"] = detect_scraper(careers_url)
+        defaults["source_health"] = "needs_setup"
+        defaults["source_discovery_status"] = "manual"
+        defaults["source_discovery_confidence"] = 100
+
+    company, created = Company.objects.get_or_create(defaults=defaults, **lookup)
     if not created:
-        for field, value in filter_updates.items():
-            if getattr(company, field) != value:
-                setattr(company, field, value)
-                update_fields.append(field)
-    if update_fields:
-        company.save(update_fields=[*update_fields, "updated_at"])
+        update_company(company, defaults)
+
+    if careers_url:
+        upsert_company_job_source(
+            company,
+            careers_url,
+            discovery_method="manual",
+            confidence_score=100,
+            status="active",
+            make_primary=True,
+        )
     return company
+
+
+def create_company_from_url(url: str, name: str = "", priority_tier: str = "", filters: dict | None = None) -> Company:
+    payload = {"careers_url": url, "name": name, "priority_tier": priority_tier}
+    payload.update(filters or {})
+    return create_company(payload)
 
 
 def update_company(company: Company, updates: dict) -> Company:
@@ -87,15 +125,35 @@ def update_company(company: Company, updates: dict) -> Company:
 
     scraper_type_supplied = "scraper_type" in updates
     if "careers_url" in updates:
-        careers_url = validate_public_careers_url(str(updates.get("careers_url") or ""))
-        if not careers_url:
-            raise ValueError("careers_url cannot be blank")
+        raw_careers_url = str(updates.get("careers_url") or "").strip()
+        careers_url = validate_public_careers_url(raw_careers_url) if raw_careers_url else ""
         if company.careers_url != careers_url:
             company.careers_url = careers_url
             update_fields.append("careers_url")
             if not scraper_type_supplied:
-                company.scraper_type = detect_scraper(careers_url)
+                company.scraper_type = detect_scraper(careers_url) if careers_url else "unknown"
                 update_fields.append("scraper_type")
+            if careers_url:
+                upsert_company_job_source(
+                    company,
+                    careers_url,
+                    discovery_method="manual",
+                    confidence_score=100,
+                    status="active",
+                    make_primary=True,
+                )
+
+    if "domain" in updates:
+        domain = normalize_domain(updates.get("domain"))
+        if company.domain != domain:
+            company.domain = domain[:180]
+            update_fields.append("domain")
+
+    if "homepage_url" in updates:
+        homepage_url = normalize_homepage_url(updates.get("homepage_url"))
+        if company.homepage_url != homepage_url:
+            company.homepage_url = homepage_url
+            update_fields.append("homepage_url")
 
     if scraper_type_supplied:
         scraper_type = str(updates.get("scraper_type") or "").strip() or "unknown"
@@ -143,6 +201,12 @@ def update_company(company: Company, updates: dict) -> Company:
         if company.alert_new_roles != alert_new_roles:
             company.alert_new_roles = alert_new_roles
             update_fields.append("alert_new_roles")
+
+    if "notes" in updates:
+        notes = str(updates.get("notes") or "").strip()
+        if company.notes != notes:
+            company.notes = notes
+            update_fields.append("notes")
 
     if update_fields:
         company.save(update_fields=[*dict.fromkeys(update_fields), "updated_at"])
@@ -203,20 +267,33 @@ def validate_public_careers_url(url: str) -> str:
 
 def scrape_company_jobs(company: Company, scraper=None) -> ScrapeLog:
     scraper = scraper or scrape
-    log = ScrapeLog.objects.create(company=company, source_platform=company.scraper_type)
+    source = primary_job_source(company)
+    log = ScrapeLog.objects.create(company=company, source=source, source_platform=(source.platform if source else company.scraper_type))
     if not company.is_active:
         message = "Company is paused; resume it before scanning."
         company.source_health = "paused"
         company.save(update_fields=["source_health", "updated_at"])
         log.finish("failed", message)
         return log
+    if not source:
+        message = "No active jobs source is configured for this company."
+        company.source_health = "needs_source"
+        company.last_scrape_status = "failed"
+        company.last_scrape_message = message
+        company.save(update_fields=["source_health", "last_scrape_status", "last_scrape_message", "updated_at"])
+        log.finish("failed", message)
+        return log
 
     try:
-        result = scraper(company.careers_url)
-        if result.company_name and company.name == infer_name_from_url(company.careers_url):
+        result = scraper(source.url)
+        if result.company_name and company.name == infer_name_from_url(company.careers_url or source.url):
             company.name = result.company_name[:180]
         company.scraper_type = result.source_platform
         company.save(update_fields=["name", "scraper_type", "updated_at"])
+        source.platform = result.source_platform
+        source.status = "active"
+        source.last_checked_at = timezone.now()
+        source.save(update_fields=["platform", "status", "last_checked_at", "updated_at"])
 
         matched_jobs = [item for item in result.jobs if job_matches_company_filters(company, item)]
         created = 0
@@ -259,6 +336,7 @@ def queue_company_scan(company: Company, trigger: str = "manual", force: bool = 
             raise ScanAlreadyRunning(f"{company.name} already has a {active_scan.status} scan.")
         return ScanJob.objects.create(
             company=company,
+            source=primary_job_source(company),
             trigger=trigger,
             source_platform=company.scraper_type,
         )
@@ -266,7 +344,6 @@ def queue_company_scan(company: Company, trigger: str = "manual", force: bool = 
 
 def execute_scan_job(scan_job: ScanJob, scraper=None) -> ScrapeLog:
     started_at = timezone.now()
-    previous_failure_count = scan_job.company.consecutive_failure_count
     scan_job.status = "running"
     scan_job.started_at = started_at
     scan_job.message = ""
@@ -303,7 +380,6 @@ def execute_scan_job(scan_job: ScanJob, scraper=None) -> ScrapeLog:
             "updated_at",
         ]
     )
-    publish_scan_job_event(scan_job, previous_failure_count)
     return log
 
 
@@ -327,72 +403,16 @@ def create_new_role_alerts(scan_job: ScanJob) -> int:
         )
         if was_created:
             created += 1
-            publish_new_role_event(alert)
     return created
-
-
-def publish_new_role_event(alert: JobAlert) -> None:
-    job = alert.job
-    company = alert.company
-    publish_mteane_event(
-        "job.new_role",
-        {
-            "alert_id": alert.id,
-            "job_id": job.id,
-            "company_id": company.id,
-            "company_name": company.name,
-            "company_priority": company.priority_tier,
-            "source_health": company.source_health,
-            "job_title": job.title,
-            "job_location": job.location,
-            "remote_policy": job.remote_policy,
-            "source_platform": job.source_platform,
-            "apply_url": job.apply_url,
-            "first_seen_at": job.first_seen_at.isoformat() if job.first_seen_at else None,
-        },
-        idempotency_key=f"job-alert-{alert.id}",
-    )
-
-
-def publish_scan_job_event(scan_job: ScanJob, previous_failure_count: int = 0) -> None:
-    company = scan_job.company
-    base_payload = {
-        "scan_job_id": scan_job.id,
-        "company_id": company.id,
-        "company_name": company.name,
-        "company_priority": company.priority_tier,
-        "source_platform": scan_job.source_platform,
-        "source_health": company.source_health,
-        "jobs_found": scan_job.jobs_found,
-        "jobs_created": scan_job.jobs_created,
-        "jobs_updated": scan_job.jobs_updated,
-        "alerts_created": scan_job.alerts_created,
-        "finished_at": scan_job.finished_at.isoformat() if scan_job.finished_at else None,
-    }
-    if scan_job.status == "failed":
-        publish_mteane_event(
-            "scan.failed",
-            {
-                **base_payload,
-                "message": scan_job.message[:500],
-                "consecutive_failure_count": company.consecutive_failure_count,
-            },
-            idempotency_key=f"scan-failed-{scan_job.id}",
-        )
-    elif scan_job.status == "success" and previous_failure_count:
-        publish_mteane_event(
-            "scan.recovered",
-            {
-                **base_payload,
-                "previous_failure_count": previous_failure_count,
-            },
-            idempotency_key=f"scan-recovered-{scan_job.id}",
-        )
 
 
 def run_due_company_scans(limit: int = 25, force: bool = False, dry_run: bool = False, now=None) -> dict:
     now = now or timezone.now()
-    candidates = [company for company in Company.objects.filter(is_active=True).order_by("name") if force or company_scan_is_due(company, now)]
+    candidates = [
+        company
+        for company in Company.objects.filter(is_active=True).prefetch_related("job_sources").order_by("name")
+        if primary_job_source(company) and (force or company_scan_is_due(company, now))
+    ]
     selected = candidates[: max(limit, 0)]
     scan_jobs = []
     scanned = 0
@@ -438,6 +458,8 @@ def run_due_company_scans(limit: int = 25, force: bool = False, dry_run: bool = 
 
 def company_scan_is_due(company: Company, now=None) -> bool:
     if not company.is_active:
+        return False
+    if not primary_job_source(company):
         return False
     if not company.last_scraped_at:
         return True
@@ -509,6 +531,8 @@ def mark_company_scan_failure(company: Company, message: str = "") -> Company:
 def health_for_company(company: Company) -> str:
     if not company.is_active:
         return "paused"
+    if not primary_job_source(company):
+        return "needs_source"
     if company.last_scrape_status == "success":
         return "active"
     if company.consecutive_failure_count:
@@ -546,6 +570,185 @@ def normalize_company_filter_updates(payload: dict) -> dict:
     if "alert_new_roles" in payload:
         updates["alert_new_roles"] = coerce_bool(payload.get("alert_new_roles"))
     return updates
+
+
+def primary_job_source(company: Company) -> CompanyJobSource | None:
+    sources = getattr(company, "_prefetched_objects_cache", {}).get("job_sources")
+    if sources is not None:
+        active_sources = [source for source in sources if source.status == "active"]
+        primary_sources = [source for source in active_sources if source.is_primary]
+        return sorted(primary_sources or active_sources, key=lambda source: (-source.confidence_score, source.id))[0] if active_sources else None
+    return company.job_sources.filter(status="active").order_by("-is_primary", "-confidence_score", "id").first()
+
+
+def upsert_company_job_source(
+    company: Company,
+    url: str,
+    *,
+    discovery_method: str = "deterministic_agent",
+    confidence_score: int = 70,
+    status: str = "needs_review",
+    make_primary: bool = False,
+    evidence: list[dict] | None = None,
+    notes: str = "",
+) -> CompanyJobSource:
+    url = validate_public_careers_url(url)
+    platform = detect_scraper(url)
+    source, _ = CompanyJobSource.objects.update_or_create(
+        url=url,
+        defaults={
+            "company": company,
+            "source_type": "ats" if platform in {"greenhouse", "lever", "ashby", "microsoft"} else "careers",
+            "platform": platform,
+            "discovery_method": discovery_method,
+            "confidence_score": clamp(confidence_score),
+            "status": status,
+            "evidence": evidence or [],
+            "notes": notes[:2000],
+        },
+    )
+    if make_primary or not company.job_sources.exclude(id=source.id).filter(is_primary=True).exists():
+        company.job_sources.exclude(id=source.id).update(is_primary=False)
+        source.is_primary = True
+        source.status = "active" if status == "active" or confidence_score >= 85 else source.status
+        source.save(update_fields=["is_primary", "status", "updated_at"])
+        company.careers_url = source.url
+        company.scraper_type = source.platform
+        company.source_health = "needs_setup" if company.is_active else "paused"
+        company.source_discovery_status = "manual" if discovery_method in {"manual", "csv"} else ("found" if source.status == "active" else "needs_review")
+        company.source_discovery_confidence = source.confidence_score
+        company.source_discovery_notes = source.notes
+        company.save(
+            update_fields=[
+                "careers_url",
+                "scraper_type",
+                "source_health",
+                "source_discovery_status",
+                "source_discovery_confidence",
+                "source_discovery_notes",
+                "updated_at",
+            ]
+        )
+    return source
+
+
+def discover_company_sources(company: Company) -> list[CompanyJobSource]:
+    candidates = source_candidates_for_company(company)
+    created_sources = []
+    for candidate in candidates:
+        source = upsert_company_job_source(
+            company,
+            candidate["url"],
+            discovery_method="deterministic_agent",
+            confidence_score=candidate["confidence_score"],
+            status="active" if candidate["confidence_score"] >= 85 else "needs_review",
+            make_primary=candidate["confidence_score"] >= 85 and not primary_job_source(company),
+            evidence=candidate["evidence"],
+            notes=candidate["notes"],
+        )
+        created_sources.append(source)
+
+    if created_sources:
+        best = sorted(created_sources, key=lambda item: item.confidence_score, reverse=True)[0]
+        company.source_discovery_status = "found" if best.status == "active" else "needs_review"
+        company.source_discovery_confidence = best.confidence_score
+        company.source_discovery_notes = best.notes
+    else:
+        company.source_discovery_status = "failed"
+        company.source_discovery_confidence = 0
+        company.source_discovery_notes = "No domain, homepage, or careers URL was available for deterministic source discovery."
+    company.source_health = health_for_company(company)
+    company.save(update_fields=["source_discovery_status", "source_discovery_confidence", "source_discovery_notes", "source_health", "updated_at"])
+    return created_sources
+
+
+def source_candidates_for_company(company: Company) -> list[dict]:
+    if company.careers_url:
+        return [
+            {
+                "url": company.careers_url,
+                "confidence_score": 100,
+                "evidence": [{"kind": "manual_url", "message": "Careers URL already exists on company.", "values": [company.careers_url]}],
+                "notes": "Existing careers URL promoted to primary source.",
+            }
+        ]
+
+    base_url = company.homepage_url or (f"https://{company.domain}" if company.domain else "")
+    if not base_url:
+        return []
+
+    parsed = urlsplit(normalize_homepage_url(base_url))
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    candidates = []
+    for index, path in enumerate(SOURCE_PATH_CANDIDATES):
+        confidence = 82 if path in {"careers", "jobs"} else 68
+        candidates.append(
+            {
+                "url": f"{root}/{path}",
+                "confidence_score": confidence - index,
+                "evidence": [{"kind": "known_path", "message": "Generated from common careers path.", "values": [path]}],
+                "notes": f"Deterministic candidate from {company.name} homepage/domain.",
+            }
+        )
+    return candidates
+
+
+def import_company_watchlist_csv(raw_csv: str) -> dict:
+    if not raw_csv.strip():
+        raise ValueError("CSV content is required")
+
+    reader = csv.DictReader(StringIO(raw_csv))
+    if not reader.fieldnames:
+        raise ValueError("CSV must include a header row")
+
+    companies = []
+    errors = []
+    for index, row in enumerate(reader, start=2):
+        payload = normalize_csv_company_row(row)
+        try:
+            company = create_company(payload)
+            if not primary_job_source(company) and payload.get("auto_discover", True):
+                discover_company_sources(company)
+            companies.append(company)
+        except Exception as exc:
+            errors.append({"row": index, "error": str(exc), "input": row})
+
+    return {"created_or_updated": len(companies), "errors": errors, "companies": companies}
+
+
+def normalize_csv_company_row(row: dict) -> dict:
+    lower = {str(key or "").strip().lower(): value for key, value in row.items()}
+    return {
+        "name": lower.get("company") or lower.get("name") or "",
+        "domain": lower.get("domain") or "",
+        "homepage_url": lower.get("homepage_url") or lower.get("website") or "",
+        "careers_url": lower.get("careers_url") or lower.get("jobs_url") or "",
+        "priority_tier": lower.get("priority") or lower.get("priority_tier") or "normal",
+        "is_active": lower.get("active", lower.get("is_active", True)),
+        "notes": lower.get("notes") or "",
+    }
+
+
+def normalize_domain(value) -> str:
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value if "://" in value else f"https://{value}")
+    host = (parsed.hostname or value).strip().lower().removeprefix("www.")
+    if not host or "." not in host:
+        return ""
+    return host[:180]
+
+
+def normalize_homepage_url(value) -> str:
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    candidate = value if "://" in value else f"https://{value}"
+    parsed = urlsplit(candidate)
+    if not parsed.netloc:
+        raise ValueError("homepage_url must include a public hostname")
+    return validate_public_careers_url(f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/"))
 
 
 def normalize_scan_frequency_hours(value) -> int:
@@ -667,3 +870,7 @@ def infer_name_from_url(url: str) -> str:
     host = (urlparse(url).hostname or url).replace("www.", "")
     parts = host.split(".")
     return (parts[-2] if len(parts) > 1 else parts[0]).replace("-", " ").title()
+
+
+def clamp(value: int) -> int:
+    return max(0, min(100, int(value)))

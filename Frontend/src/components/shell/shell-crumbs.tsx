@@ -6,9 +6,6 @@ const labels: Record<string, string> = {
   "/": "Today",
   "/companies": "Companies",
   "/jobs": "Jobs",
-  "/applications": "Applications",
-  "/agents": "Agents",
-  "/analytics": "Analytics",
   "/profile": "Profile",
   "/settings": "Settings",
 };

@@ -11,9 +11,9 @@ for (const expected of ["<main", "aria-label=\"Primary\"", "aria-label=\"Workspa
   }
 }
 
-const settingsPanels = readFileSync(join(root, "src/components/settings/settings-panels.tsx"), "utf8");
-for (const control of ["Watchlist JSON", "Workspace export JSON", "Confirmation phrase", "Quiet hours", "Digest"]) {
-  if (!settingsPanels.includes(control)) {
+const settingsPage = readFileSync(join(root, "src/app/settings/page.tsx"), "utf8");
+for (const control of ["Email address", "Minimum match score", "Minimum confidence", "AI", "Notifications"]) {
+  if (!settingsPage.includes(control)) {
     failures.push(`Settings controls missing visible label: ${control}`);
   }
 }
@@ -23,9 +23,6 @@ const routeFiles = [
   "src/app/companies/page.tsx",
   "src/app/jobs/page.tsx",
   "src/app/profile/page.tsx",
-  "src/app/applications/page.tsx",
-  "src/app/agents/page.tsx",
-  "src/app/analytics/page.tsx",
   "src/app/settings/page.tsx",
 ];
 

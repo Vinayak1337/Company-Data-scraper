@@ -25,7 +25,7 @@ COMPANY_RESPONSE="$(
   curl -fsS -X POST "${BACKEND_URL}/companies" \
     "${AUTH_HEADER[@]}" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"Smoke Test ${STAMP}\",\"careers_url\":\"${COMPANY_URL}\",\"priority_tier\":\"fallback\",\"title_keywords\":[\"engineer\"]}"
+    -d "{\"name\":\"Smoke Test ${STAMP}\",\"domain\":\"example.com\",\"careers_url\":\"${COMPANY_URL}\",\"priority_tier\":\"fallback\",\"is_active\":true}"
 )"
 COMPANY_ID="$(printf '%s' "${COMPANY_RESPONSE}" | json_field id)"
 if [ -z "${COMPANY_ID}" ]; then
@@ -33,8 +33,8 @@ if [ -z "${COMPANY_ID}" ]; then
   exit 1
 fi
 
-echo "Checking scan dry-run endpoint"
-curl -fsS -X POST "${BACKEND_URL}/scans/run" \
+echo "Checking crawl dry-run endpoint"
+curl -fsS -X POST "${BACKEND_URL}/crawls/run-due" \
   "${AUTH_HEADER[@]}" \
   -H "Content-Type: application/json" \
   -d '{"dry_run":true,"limit":1}' >/dev/null
@@ -50,22 +50,11 @@ fi
 
 echo "Checking match-ranked jobs endpoint"
 JOBS_RESPONSE="$(curl -fsS "${AUTH_HEADER[@]}" "${BACKEND_URL}/jobs?strong_fit_first=true")"
-FIRST_JOB_ID="$(printf '%s' "${JOBS_RESPONSE}" | python3 -c 'import json, sys; data=json.load(sys.stdin); rows=data.get("results") or []; print(rows[0].get("id", "") if rows else "")')"
-if [ -n "${FIRST_JOB_ID}" ]; then
-  echo "Checking application tracking endpoint with job ${FIRST_JOB_ID}"
-  curl -fsS -X POST "${BACKEND_URL}/applications" \
-    "${AUTH_HEADER[@]}" \
-    -H "Content-Type: application/json" \
-    -d "{\"job_id\":${FIRST_JOB_ID},\"status\":\"saved\",\"next_action\":\"Smoke review\"}" >/dev/null
-else
-  echo "No stored jobs available; skipping application-create smoke step"
-fi
+printf '%s' "${JOBS_RESPONSE}" | python3 -c 'import json, sys; data=json.load(sys.stdin); assert "results" in data'
 
-echo "Checking alerts endpoint"
-curl -fsS "${AUTH_HEADER[@]}" "${BACKEND_URL}/alerts?limit=1" >/dev/null
-
-echo "Checking export endpoint"
-curl -fsS "${AUTH_HEADER[@]}" "${BACKEND_URL}/export" >/dev/null
+echo "Checking V3 settings endpoints"
+curl -fsS "${AUTH_HEADER[@]}" "${BACKEND_URL}/notifications/preferences" >/dev/null
+curl -fsS "${AUTH_HEADER[@]}" "${BACKEND_URL}/agents/runtime" >/dev/null
 
 echo "Cleaning smoke-test company ${COMPANY_ID}"
 curl -fsS -X DELETE "${AUTH_HEADER[@]}" "${BACKEND_URL}/companies/${COMPANY_ID}" >/dev/null

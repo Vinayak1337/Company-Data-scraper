@@ -3,14 +3,11 @@ import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
 const checks = [
-  { route: "Today", files: ["src/app/page.tsx", "src/app/actions.ts"], terms: ["Today", "listTodayActions", "saveJobAlert", "skipJobAlert"] },
-  { route: "Companies", file: "src/app/companies/page.tsx", terms: ["Companies", "listCompanies", "AddCompanyForm"] },
-  { route: "Jobs", file: "src/app/jobs/page.tsx", terms: ["Jobs", "listJobs", "strong_fit_first"] },
+  { route: "Today", files: ["src/app/page.tsx", "src/app/actions.ts"], terms: ["Today", "runDueCrawlsAction", "runAgentAction"] },
+  { route: "Companies", files: ["src/app/companies/page.tsx", "src/app/companies/actions.ts"], terms: ["Companies", "listCompanies", "importCompaniesCsvAction", "discoverCompanySourceAction"] },
+  { route: "Jobs", files: ["src/app/jobs/page.tsx", "src/app/jobs/actions.ts"], terms: ["Jobs", "listJobs", "submitJobFeedbackAction"] },
   { route: "Profile", files: ["src/app/profile/page.tsx", "src/app/profile/actions.ts"], terms: ["Profile", "getProfile", "importResumeToProfile"] },
-  { route: "Applications", files: ["src/app/applications/page.tsx", "src/app/applications/actions.ts"], terms: ["Applications", "listApplications", "generateApplicationTailoringArtifacts"] },
-  { route: "Agents", file: "src/app/agents/page.tsx", terms: ["Agents", "listAgentRuns", "Approval queue"] },
-  { route: "Analytics", file: "src/app/analytics/page.tsx", terms: ["Analytics", "getAnalyticsOverview", "Weekly review"] },
-  { route: "Settings", file: "src/app/settings/page.tsx", terms: ["Settings", "ExportPanel", "ImportWorkspacePanel", "DeletePersonalDataPanel"] },
+  { route: "Settings", files: ["src/app/settings/page.tsx", "src/app/settings/actions.ts"], terms: ["Settings", "updateNotificationPreferencesAction", "updateAgentProviderAction"] },
 ];
 
 const failures = [];
@@ -34,7 +31,7 @@ for (const check of checks) {
 }
 
 const shell = readFileSync(join(root, "src/components/shell/app-shell.tsx"), "utf8");
-for (const label of ["Today", "Companies", "Jobs", "Applications", "Agents", "Analytics", "Profile", "Settings"]) {
+for (const label of ["Today", "Companies", "Jobs", "Profile", "Settings"]) {
   if (!shell.includes(`label: "${label}"`)) {
     failures.push(`App shell: missing nav label ${label}`);
   }

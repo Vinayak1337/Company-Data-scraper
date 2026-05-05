@@ -10,9 +10,6 @@ const primaryNav = [
   { href: "/", label: "Today", shortcut: "T", icon: "today" },
   { href: "/companies", label: "Companies", shortcut: "C", icon: "companies" },
   { href: "/jobs", label: "Jobs", shortcut: "J", icon: "jobs" },
-  { href: "/applications", label: "Applications", shortcut: "A", icon: "applications" },
-  { href: "/agents", label: "Agents", shortcut: "G", icon: "agents" },
-  { href: "/analytics", label: "Analytics", shortcut: "N", icon: "analytics" },
 ] as const;
 
 const secondaryNav = [
@@ -38,7 +35,7 @@ export function AppShell({ children }: AppShellProps) {
                 Job Scout
               </div>
               <div className="font-mono text-[10px] text-[var(--ink-3)]">
-                v2 · operator
+                v3 · watchlist
               </div>
             </div>
           </Link>
@@ -81,7 +78,7 @@ export function AppShell({ children }: AppShellProps) {
             <Link href="/" className="min-w-0">
               <div className="truncate font-serif text-base font-medium">Job Scout</div>
               <div className="font-mono text-[10px] text-[var(--ink-3)]">
-                v2 · operator
+                v3 · watchlist
               </div>
             </Link>
             <div className="flex items-center gap-2">

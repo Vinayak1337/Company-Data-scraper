@@ -10,6 +10,16 @@ class Job(models.Model):
         ("onsite", "Onsite"),
     ]
 
+    STATUS_CHOICES = [
+        ("new", "New"),
+        ("open", "Open"),
+        ("notified", "Notified"),
+        ("saved", "Saved"),
+        ("dismissed", "Dismissed"),
+        ("stale", "Stale"),
+        ("closed", "Closed"),
+    ]
+
     company = models.ForeignKey("companies.Company", on_delete=models.CASCADE, related_name="jobs")
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255, blank=True)
@@ -21,6 +31,7 @@ class Job(models.Model):
     posted_at = models.DateTimeField(null=True, blank=True)
     tags = models.JSONField(default=list, blank=True)
     remote_policy = models.CharField(max_length=20, choices=REMOTE_CHOICES, default="unknown")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
     first_seen_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)

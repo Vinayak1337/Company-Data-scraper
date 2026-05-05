@@ -50,15 +50,21 @@ services:
       - key: LANGSMITH_API_KEY
         sync: false
       - key: LANGSMITH_PROJECT
-        value: job-scout-v2
-      - key: MTEANE_ENABLED
-        value: false
-      - key: MTEANE_API_URL
+        value: job-scout-v3
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: DEFAULT_FROM_EMAIL
         sync: false
-      - key: MTEANE_API_KEY
+      - key: EMAIL_HOST
         sync: false
-      - key: MTEANE_TIMEOUT_SECONDS
-        value: 3
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: true
 
   - type: web
     name: job-scout-frontend

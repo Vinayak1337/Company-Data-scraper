@@ -1,60 +1,59 @@
 # Job Scout
 
-Self-hosted developer job tracker. The `v2` branch is being reshaped into a split app:
+Self-hosted profile-first company watchlist for job discovery and matching.
 
-- `Frontend/`: Next.js app for the v2 product UI.
-- `Backend/`: Django/Python backend, legacy v1 HTMX UI, scraper adapters, API, and deployment files.
-- `docs/`: v2 planning and build-task docs.
-- `render.yaml`: Render Blueprint for the split Backend/Frontend deployment.
-- `scripts/`: local and deployment smoke-test helpers.
+V3 focuses on one useful loop:
 
-The v2 north star is favorite-company tracking: users should not miss relevant openings posted by companies they intentionally watch.
+1. Complete profile, AI, and notification setup.
+2. Import a CSV watchlist of companies.
+3. Discover each company's public jobs source.
+4. Periodically crawl active companies.
+5. Match discovered jobs against the profile.
+6. Notify the user only when a job clears score and confidence thresholds.
+7. Capture feedback so future matches become stricter or looser.
 
-## Current Backend Features
+## Repository Layout
 
-- Django-rendered dashboard with HTMX partial updates.
-- Compiled TailwindCSS dark interface.
-- Company tracking by careers or ATS URL.
-- Scraper adapters for Greenhouse, Lever, Ashby, and generic HTML pages.
-- Microsoft Careers job-detail URLs via structured `JobPosting` data.
-- Curated top-tier companies seeded on migration.
-- Local filters for title, keyword, company, location, tech stack, and work mode.
-- India-first default feed with state and city filters.
-- Simple JSON API.
-- Render deployment files included.
+- `Backend/`: Django API, scraper adapters, source discovery, matching, notifications, and agent runtime audit.
+- `Frontend/`: Next.js console for Today, Companies, Jobs, Profile, and Settings.
+- `docs/v3-plan.md`: detailed implementation plan.
+- `docs/design.md`: V3 product, UX, backend, API, and data design.
+- `render.yaml`, `docker-compose.yml`: deployment/runtime scaffolding.
+
+## Current V3 Surface
+
+- Profile setup with resume import, target titles, claims, and search strategy.
+- Company watchlist with CSV import, active/inactive toggles, manual source override, and source discovery.
+- Crawl runs for active companies with source health and run history.
+- Weighted ML-style matching with score, confidence, evidence, threshold, and local agent summary.
+- Feedback events such as good match, bad match, wrong role, wrong location, too many notifications, and want more matches.
+- Notification preferences for email address, immediate/digest delivery, minimum score, and minimum confidence.
+- Agent provider settings and local deterministic agent reviews for source discovery, match review, and notification review.
 
 ## Backend Local Setup
-
-Fast path:
-
-```bash
-cd Backend
-./start.sh
-```
-
-Or:
-
-```bash
-cd Backend
-npm start
-```
-
-The start script creates `.venv` if needed, installs Python deps, installs Node deps if needed, builds Tailwind, runs migrations, seeds default companies, and starts Django.
-
-Manual setup:
 
 ```bash
 cd Backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-npm install
-npm run build:css
 python manage.py migrate
 python manage.py runserver
 ```
 
-Open `http://127.0.0.1:8000`.
+The backend API defaults to `http://127.0.0.1:8000/api`.
+
+Local email defaults to Django's console backend. Configure SMTP for real delivery:
+
+```bash
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=true
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+DEFAULT_FROM_EMAIL="Job Scout <jobs@example.com>"
+```
 
 ## Frontend Local Setup
 
@@ -66,72 +65,58 @@ npm run dev
 
 Open `http://127.0.0.1:3000`.
 
-By default the frontend calls `http://127.0.0.1:8000/api`. Override it with:
+Override the backend URL when needed:
 
 ```bash
 BACKEND_API_BASE_URL=http://127.0.0.1:8000/api npm run dev
 ```
 
-## Deployment
+## Useful API Endpoints
 
-The project supports Vercel frontend plus a Docker/VPS backend stack, and still includes a split Render Blueprint with separate Backend and Frontend services plus Postgres. See [docs/deployment-readiness.md](docs/deployment-readiness.md), [docs/vps-docker.md](docs/vps-docker.md), [docs/vercel.md](docs/vercel.md), [docs/deployment.md](docs/deployment.md), [docs/mteane.md](docs/mteane.md), [docs/backup-export.md](docs/backup-export.md), and [docs/smoke-test.md](docs/smoke-test.md).
+- `GET /api/health`
+- `GET /api/diagnostics`
+- `GET/PATCH /api/profile`
+- `GET/PATCH /api/notifications/preferences`
+- `GET/POST /api/companies`
+- `POST /api/companies/import-csv`
+- `POST /api/companies/<id>/discover-source`
+- `POST /api/companies/<id>/sources`
+- `POST /api/companies/<id>/crawl`
+- `GET /api/crawls`
+- `POST /api/crawls/run-due`
+- `GET /api/jobs`
+- `POST /api/jobs/<id>/feedback`
+- `GET/PATCH /api/agents/providers`
+- `GET/POST /api/agents/runs`
 
-Backend stack with Docker:
-
-```bash
-docker compose up --build
-```
-
-Optional MTEANE event automation profile:
-
-```bash
-git submodule update --init --recursive
-docker compose --profile mteane up --build
-```
-
-Run a local smoke test after both dev servers are up:
-
-```bash
-./scripts/smoke-test.sh
-```
-
-## Usage
-
-Backend v1 UI:
-
-1. Paste a careers or ATS URL such as `https://jobs.lever.co/company` or `https://boards.greenhouse.io/company`.
-2. Click **Add company**.
-3. Click **Scrape** on the company card.
-4. Filter jobs from the dashboard.
-5. Use **Open application** or **Apply** to visit the original posting.
-
-To reseed the default company list later:
+Send queued notification emails:
 
 ```bash
 cd Backend
-python manage.py seed_companies
+python manage.py send_match_notifications --limit 25
 ```
 
-## API
-
-- `GET /api/health`
-- `GET /api/jobs`
-- `GET /api/jobs/<id>`
-- `GET /api/companies`
-- `POST /api/companies`
-- `POST /api/companies/<id>/scrape`
-
-Example:
+Example CSV import:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/companies \
+curl -X POST http://127.0.0.1:8000/api/companies/import-csv \
   -H "Content-Type: application/json" \
-  -d '{"careers_url":"https://jobs.lever.co/example","name":"Example"}'
+  -d '{"csv":"company,domain,active\nAcme,acme.com,true\n"}'
 ```
 
-## V2 Direction
+## Verification
 
-The `v2` branch is reserved for favorite-company tracking, source health, scheduled scans, relevant-role alerts, and optional profile/AI support for ranking and application prep.
+Backend:
 
-See [docs/v2-plan.md](docs/v2-plan.md) for the detailed v2 product plan.
-See [docs/v2-build-tasks.md](docs/v2-build-tasks.md) for implementation workstreams and delegate-friendly task groups.
+```bash
+cd Backend
+./.venv/bin/python manage.py test api scrapers_engine companies matching notifications profiles agents
+```
+
+Frontend:
+
+```bash
+cd Frontend
+npm run lint
+npm run build
+```

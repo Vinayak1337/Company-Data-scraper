@@ -131,3 +131,29 @@ class SearchStrategy(models.Model):
 
     def __str__(self) -> str:
         return f"Search strategy for {self.profile}"
+
+
+class UserSearchPreference(models.Model):
+    STRICTNESS_CHOICES = [
+        ("loose", "Loose"),
+        ("balanced", "Balanced"),
+        ("strict", "Strict"),
+    ]
+
+    profile = models.OneToOneField(CandidateProfile, on_delete=models.CASCADE, related_name="search_preferences")
+    minimum_match_score = models.PositiveIntegerField(default=70)
+    minimum_confidence_score = models.PositiveIntegerField(default=55)
+    match_strictness = models.CharField(max_length=20, choices=STRICTNESS_CHOICES, default="balanced")
+    preferred_seniority = models.JSONField(default=list, blank=True)
+    excluded_keywords = models.JSONField(default=list, blank=True)
+    excluded_companies = models.JSONField(default=list, blank=True)
+    feedback_weights = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "user search preference"
+        verbose_name_plural = "user search preferences"
+
+    def __str__(self) -> str:
+        return f"Search preferences for {self.profile}"

@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
-  Bot,
   BriefcaseBusiness,
   Building2,
   LayoutDashboard,
-  ListChecks,
   Settings,
   UserRound,
   type LucideIcon,
@@ -19,10 +16,7 @@ const iconMap: Record<string, LucideIcon> = {
   today: LayoutDashboard,
   companies: Building2,
   jobs: BriefcaseBusiness,
-  applications: ListChecks,
   profile: UserRound,
-  analytics: BarChart3,
-  agents: Bot,
   settings: Settings,
 };
 

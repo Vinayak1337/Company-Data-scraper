@@ -27,18 +27,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-    "applications",
     "companies",
-    "discovery",
-    "intelligence",
-    "interviews",
     "jobs",
     "profiles",
     "agents",
-    "analytics",
     "notifications",
     "matching",
-    "dashboard",
     "api",
 ]
 
@@ -118,7 +112,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [path for path in [BASE_DIR / "static"] if path.exists()]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
@@ -140,9 +134,13 @@ AGENT_EXECUTION_MODE = os.environ.get("AGENT_EXECUTION_MODE", "inline").strip().
 AGENT_QUEUE_BATCH_SIZE = int(os.environ.get("AGENT_QUEUE_BATCH_SIZE", "5"))
 
 LANGSMITH_TRACING = os.environ.get("LANGSMITH_TRACING", "False").lower() in {"1", "true", "yes"}
-LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "job-scout-v2").strip()
+LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "job-scout-v3").strip()
 
-MTEANE_ENABLED = os.environ.get("MTEANE_ENABLED", "False").lower() in {"1", "true", "yes"}
-MTEANE_API_URL = os.environ.get("MTEANE_API_URL", "").strip()
-MTEANE_API_KEY = os.environ.get("MTEANE_API_KEY", "").strip()
-MTEANE_TIMEOUT_SECONDS = float(os.environ.get("MTEANE_TIMEOUT_SECONDS", "3"))
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "False").lower() in {"1", "true", "yes"}
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").lower() in {"1", "true", "yes"}
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Job Scout <job-scout@example.local>")

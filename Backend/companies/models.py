@@ -27,6 +27,8 @@ class Company(models.Model):
 
     SOURCE_HEALTH_CHOICES = [
         ("needs_setup", "Needs setup"),
+        ("needs_source", "Needs source"),
+        ("needs_review", "Needs review"),
         ("active", "Active"),
         ("degraded", "Degraded"),
         ("failing", "Failing"),
@@ -41,12 +43,31 @@ class Company(models.Model):
         ("onsite", "Onsite"),
     ]
 
+    DISCOVERY_STATUS_CHOICES = [
+        ("not_started", "Not started"),
+        ("queued", "Queued"),
+        ("found", "Found"),
+        ("needs_review", "Needs review"),
+        ("failed", "Failed"),
+        ("manual", "Manual"),
+    ]
+
     name = models.CharField(max_length=180)
-    careers_url = models.URLField(unique=True)
+    domain = models.CharField(max_length=180, blank=True)
+    homepage_url = models.URLField(blank=True)
+    careers_url = models.URLField(blank=True, default="")
     priority_tier = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default="normal")
     scraper_type = models.CharField(max_length=40, choices=SCRAPER_CHOICES, default="unknown")
     is_active = models.BooleanField(default=True)
     source_health = models.CharField(max_length=20, choices=SOURCE_HEALTH_CHOICES, default="needs_setup")
+    source_discovery_status = models.CharField(
+        max_length=20,
+        choices=DISCOVERY_STATUS_CHOICES,
+        default="not_started",
+    )
+    source_discovery_confidence = models.PositiveIntegerField(default=0)
+    source_discovery_notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
     title_keywords = models.JSONField(default=list, blank=True)
     negative_title_keywords = models.JSONField(default=list, blank=True)
     location_keywords = models.JSONField(default=list, blank=True)
@@ -66,6 +87,10 @@ class Company(models.Model):
     class Meta:
         ordering = ["name"]
         verbose_name_plural = "companies"
+        constraints = [
+            models.UniqueConstraint(fields=["domain"], condition=~models.Q(domain=""), name="unique_company_domain_when_present"),
+            models.UniqueConstraint(fields=["careers_url"], condition=~models.Q(careers_url=""), name="unique_company_careers_url_when_present"),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -88,6 +113,58 @@ class Company(models.Model):
             update_fields.extend(["last_failed_scan_at", "consecutive_failure_count", "source_health"])
         self.save(update_fields=update_fields)
 
+    @property
+    def primary_source(self):
+        return self.job_sources.filter(is_primary=True).order_by("-confidence_score", "id").first()
+
+
+class CompanyJobSource(models.Model):
+    SOURCE_TYPE_CHOICES = [
+        ("careers", "Careers"),
+        ("jobs", "Jobs"),
+        ("ats", "ATS"),
+        ("manual", "Manual"),
+        ("unknown", "Unknown"),
+    ]
+
+    DISCOVERY_METHOD_CHOICES = [
+        ("manual", "Manual"),
+        ("csv", "CSV"),
+        ("deterministic_agent", "Deterministic agent"),
+        ("llm_agent", "LLM agent"),
+    ]
+
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("needs_review", "Needs review"),
+        ("failed", "Failed"),
+        ("disabled", "Disabled"),
+    ]
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="job_sources")
+    url = models.URLField(max_length=1000, unique=True)
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default="careers")
+    platform = models.CharField(max_length=40, default="unknown")
+    discovery_method = models.CharField(max_length=40, choices=DISCOVERY_METHOD_CHOICES, default="deterministic_agent")
+    confidence_score = models.PositiveIntegerField(default=50)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="needs_review")
+    is_primary = models.BooleanField(default=False)
+    evidence = models.JSONField(default=list, blank=True)
+    notes = models.TextField(blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["company__name", "-is_primary", "-confidence_score", "url"]
+        indexes = [
+            models.Index(fields=["company", "status"]),
+            models.Index(fields=["is_primary", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.name}: {self.url}"
+
 
 class ScrapeLog(models.Model):
     STATUS_CHOICES = [
@@ -97,6 +174,7 @@ class ScrapeLog(models.Model):
     ]
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="scrape_logs")
+    source = models.ForeignKey(CompanyJobSource, on_delete=models.SET_NULL, null=True, blank=True, related_name="scrape_logs")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="running")
     source_platform = models.CharField(max_length=40, blank=True)
     jobs_found = models.PositiveIntegerField(default=0)
@@ -137,6 +215,7 @@ class ScanJob(models.Model):
     ]
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="scan_jobs")
+    source = models.ForeignKey(CompanyJobSource, on_delete=models.SET_NULL, null=True, blank=True, related_name="crawl_runs")
     scrape_log = models.OneToOneField(ScrapeLog, on_delete=models.SET_NULL, null=True, blank=True, related_name="scan_job")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="queued")
     trigger = models.CharField(max_length=20, choices=TRIGGER_CHOICES, default="manual")

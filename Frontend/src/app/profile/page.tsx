@@ -41,7 +41,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       <PageHeader
         title="Profile"
         eyebrow="Candidate"
-        description="Build reusable developer context for role alerts, applications, and future match analysis."
+        description="Build reusable candidate context for source discovery, job matching, and notification decisions."
         actions={
           <form action={generateTargetTitlesAction}>
             <Button type="submit" variant="primary">

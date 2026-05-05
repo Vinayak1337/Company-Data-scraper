@@ -45,10 +45,10 @@ class AgentProviderSetting(models.Model):
 class AgentRun(models.Model):
     AGENT_TYPE_CHOICES = [
         ("profile_builder", "Profile Builder"),
+        ("source_discovery", "Source Discovery"),
         ("match_review", "Match Review"),
         ("search_strategy", "Search Strategy"),
-        ("application_prep", "Application Prep"),
-        ("follow_up", "Follow-Up"),
+        ("notification_review", "Notification Review"),
     ]
 
     STATUS_CHOICES = [

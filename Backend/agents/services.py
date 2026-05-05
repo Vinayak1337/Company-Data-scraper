@@ -20,13 +20,13 @@ from agents.models import (
 from agents.observability import execute_with_optional_langsmith
 from agents.runtime import (
     DisabledRuntimeAdapter,
-    LocalApplicationPrepAdapter,
-    LocalFollowUpAdapter,
     LocalMatchReviewAdapter,
+    LocalNotificationReviewAdapter,
     LocalProfileBuilderAdapter,
     LocalSearchStrategyAdapter,
+    LocalSourceDiscoveryAdapter,
 )
-from applications.models import Application
+from companies.models import Company
 from jobs.models import Job
 from matching.services import refresh_job_matches, serialize_job_match
 from profiles.models import CandidateProfile
@@ -122,10 +122,10 @@ PROVIDER_DEFAULTS = [
 
 AGENT_PROMPT_VERSIONS = {
     "profile_builder": "local-profile-builder-v1",
+    "source_discovery": "local-source-discovery-v1",
     "match_review": "local-match-review-v1",
     "search_strategy": "local-search-strategy-v1",
-    "application_prep": "local-application-prep-v1",
-    "follow_up": "local-follow-up-v1",
+    "notification_review": "local-notification-review-v1",
 }
 
 BLOCKED_POLICY_LEVELS = {"external_action"}
@@ -360,8 +360,8 @@ def set_agent_decision_status(decision: AgentDecision, status: str) -> AgentDeci
 def adapter_for_run(run: AgentRun):
     provider_setting = AgentProviderSetting.objects.get(provider=run.provider)
     if run.tool_policy in BLOCKED_POLICY_LEVELS:
-        add_step(run, "Policy check", "failed", "External actions are blocked in v2.")
-        raise ValueError("External actions are blocked in v2.")
+        add_step(run, "Policy check", "failed", "External actions are blocked in V3.")
+        raise ValueError("External actions are blocked in V3.")
     if not provider_setting.enabled:
         add_step(run, "Provider disabled", "failed", "This runtime provider is disabled in settings.")
         return DisabledRuntimeAdapter()
@@ -371,10 +371,10 @@ def adapter_for_run(run: AgentRun):
     if run.provider == "direct_api":
         adapters = {
             "profile_builder": ("Local profile analysis", "Running deterministic Profile Builder review.", LocalProfileBuilderAdapter),
+            "source_discovery": ("Local source discovery review", "Reviewing companies that need jobs sources.", LocalSourceDiscoveryAdapter),
             "match_review": ("Local match review", "Reviewing strongest and weakest job matches.", LocalMatchReviewAdapter),
             "search_strategy": ("Local search strategy review", "Reviewing search strategy coverage.", LocalSearchStrategyAdapter),
-            "application_prep": ("Local application prep", "Reviewing saved applications and prep gaps.", LocalApplicationPrepAdapter),
-            "follow_up": ("Local follow-up review", "Reviewing due follow-ups and next actions.", LocalFollowUpAdapter),
+            "notification_review": ("Local notification review", "Reviewing jobs selected for notifications.", LocalNotificationReviewAdapter),
         }
         if run.agent_type in adapters:
             name, message, adapter_cls = adapters[run.agent_type]
@@ -458,6 +458,9 @@ def build_input_snapshot(agent_type: str, provider_setting: AgentProviderSetting
         jobs = list(Job.objects.select_related("company").order_by("-first_seen_at")[:50])
         matches = refresh_job_matches(jobs)
         snapshot["jobs"] = [serialize_job_snapshot(job, matches.get(job.id)) for job in jobs]
+    elif agent_type == "source_discovery":
+        companies = list(Company.objects.prefetch_related("job_sources").order_by("source_health", "name")[:100])
+        snapshot["companies"] = [serialize_company_snapshot(company) for company in companies]
     elif agent_type == "search_strategy":
         profile = CandidateProfile.objects.prefetch_related("target_titles", "claims").order_by("id").first()
         snapshot["profile"] = serialize_profile_snapshot(profile)
@@ -472,9 +475,10 @@ def build_input_snapshot(agent_type: str, provider_setting: AgentProviderSetting
                 "work_mode_preferences": strategy.work_mode_preferences,
                 "notes": strategy.notes,
             }
-    elif agent_type in {"application_prep", "follow_up"}:
-        applications = Application.objects.select_related("job", "job__company").prefetch_related("artifacts").order_by("follow_up_at", "-updated_at")[:50]
-        snapshot["applications"] = [serialize_application_snapshot(application) for application in applications]
+    elif agent_type == "notification_review":
+        jobs = list(Job.objects.select_related("company").order_by("-first_seen_at")[:50])
+        matches = refresh_job_matches(jobs)
+        snapshot["jobs"] = [serialize_job_snapshot(job, matches.get(job.id)) for job in jobs]
     return snapshot
 
 
@@ -531,6 +535,8 @@ def serialize_job_snapshot(job: Job, match) -> dict:
         "match": {
             "overall_score": match_payload.get("overall_score", 0),
             "confidence_score": match_payload.get("confidence_score", 0),
+            "notification_threshold": match_payload.get("notification_threshold", 0),
+            "should_notify": match_payload.get("should_notify", False),
             "apply_priority": match_payload.get("apply_priority", "unknown"),
             "reasons_to_apply": match_payload.get("reasons_to_apply", []),
             "reasons_to_skip": match_payload.get("reasons_to_skip", []),
@@ -539,18 +545,17 @@ def serialize_job_snapshot(job: Job, match) -> dict:
     }
 
 
-def serialize_application_snapshot(application: Application) -> dict:
+def serialize_company_snapshot(company: Company) -> dict:
+    primary_source = next((source for source in company.job_sources.all() if source.is_primary), None)
     return {
-        "id": application.id,
-        "status": application.status,
-        "job_title": application.job.title,
-        "company": application.job.company.name,
-        "location": application.job.location,
-        "next_action": application.next_action,
-        "follow_up_at": application.follow_up_at.isoformat() if application.follow_up_at else None,
-        "notes": application.notes,
-        "artifact_types": [artifact.artifact_type for artifact in application.artifacts.all()],
-        "approved_artifacts": [artifact.title for artifact in application.artifacts.all() if artifact.status == "approved"],
+        "id": company.id,
+        "name": company.name,
+        "domain": company.domain,
+        "homepage_url": company.homepage_url,
+        "source_health": company.source_health,
+        "source_discovery_status": company.source_discovery_status,
+        "source_discovery_confidence": company.source_discovery_confidence,
+        "primary_source_url": primary_source.url if primary_source else "",
     }
 
 
@@ -559,7 +564,7 @@ def record_permissions(run: AgentRun, tool_policy: str) -> None:
     for policy in policies:
         if policy == tool_policy or policy == "read_only":
             status = "blocked" if policy in BLOCKED_POLICY_LEVELS else "granted"
-            reason = "External actions are blocked in v2." if status == "blocked" else "Allowed by selected policy."
+            reason = "External actions are blocked in V3." if status == "blocked" else "Allowed by selected policy."
         else:
             status = "blocked"
             reason = "Not included in selected tool policy."
@@ -620,10 +625,10 @@ def create_review_decisions(run: AgentRun, output: dict) -> int:
 def default_decision_question(agent_type: str) -> str:
     defaults = {
         "profile_builder": "Review these profile recommendations?",
+        "source_discovery": "Review source discovery recommendations?",
         "match_review": "Review these match recommendations?",
         "search_strategy": "Review these search strategy changes?",
-        "application_prep": "Review these application prep suggestions?",
-        "follow_up": "Review these follow-up suggestions?",
+        "notification_review": "Review these notification recommendations?",
     }
     return defaults.get(agent_type, "Review this agent proposal?")
 
@@ -633,12 +638,12 @@ def run_summary(run: AgentRun, output: dict) -> str:
         return f"Profile Builder completed with readiness score {output.get('readiness_score', 0)}/100."
     if run.agent_type == "match_review":
         return f"Match Review found {output.get('apply_now_count', 0)} apply-now roles and {output.get('risk_count', 0)} roles to check."
+    if run.agent_type == "source_discovery":
+        return f"Source Discovery reviewed {output.get('companies_reviewed', 0)} companies and found {output.get('needs_source_count', 0)} needing source review."
     if run.agent_type == "search_strategy":
         return f"Search Strategy reviewed {output.get('keyword_count', 0)} keywords across {output.get('role_family_count', 0)} role families."
-    if run.agent_type == "application_prep":
-        return f"Application Prep found {output.get('needs_artifacts_count', 0)} applications needing artifacts."
-    if run.agent_type == "follow_up":
-        return f"Follow-Up reviewed {output.get('due_count', 0)} due or ready next actions."
+    if run.agent_type == "notification_review":
+        return f"Notification Review selected {output.get('notify_count', 0)} jobs and held {output.get('held_count', 0)}."
     return "Agent run completed."
 
 

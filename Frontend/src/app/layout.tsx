@@ -23,8 +23,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Job Scout V2",
-  description: "Developer operating console for company monitoring, role triage, and applications.",
+  title: "Job Scout V3",
+  description: "Profile-first company watchlist for source discovery, job matching, and notifications.",
 };
 
 export default function RootLayout({

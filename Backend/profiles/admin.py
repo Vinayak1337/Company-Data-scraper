@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CandidateProfile, ProfileClaim, TargetTitle
+from .models import CandidateProfile, ProfileClaim, TargetTitle, UserSearchPreference
 
 
 @admin.register(CandidateProfile)
@@ -21,3 +21,9 @@ class ProfileClaimAdmin(admin.ModelAdmin):
     list_display = ("claim_type", "status", "source", "updated_at")
     list_filter = ("claim_type", "status", "source")
     search_fields = ("text", "evidence")
+
+
+@admin.register(UserSearchPreference)
+class UserSearchPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("profile", "minimum_match_score", "minimum_confidence_score", "match_strictness", "updated_at")
+    list_filter = ("match_strictness",)

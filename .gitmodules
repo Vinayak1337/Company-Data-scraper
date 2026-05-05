@@ -1,4 +1,0 @@
-[submodule "integrations/mteane"]
-	path = integrations/mteane
-	url = https://github.com/MTEANE/MTEANE.git
-	branch = producer/full-api-coverage

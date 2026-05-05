@@ -138,7 +138,7 @@ class LocalSearchStrategyAdapter(RuntimeAdapter):
         if not strategy.get("location_keywords") and profile.get("location"):
             gaps.append("Convert preferred locations into strategy keywords.")
         if not gaps:
-            gaps.append("Search strategy is usable; review analytics feedback weekly.")
+            gaps.append("Search strategy is usable; tune it with match feedback over time.")
         return RuntimeResult(
             status="success",
             output={
@@ -165,23 +165,24 @@ class LocalSearchStrategyAdapter(RuntimeAdapter):
         )
 
 
-class LocalApplicationPrepAdapter(RuntimeAdapter):
-    adapter_name = "local_application_prep"
+class LocalSourceDiscoveryAdapter(RuntimeAdapter):
+    adapter_name = "local_source_discovery"
 
     def execute(self, invocation_payload: dict) -> RuntimeResult:
-        applications = invocation_payload["context"].get("applications") or []
-        active = [item for item in applications if item.get("status") in {"saved", "applying", "applied", "interviewing"}]
-        needs_artifacts = [item for item in active if not item.get("artifact_types")]
+        companies = invocation_payload["context"].get("companies") or []
+        needs_source = [item for item in companies if item.get("source_health") in {"needs_source", "needs_review"}]
+        ready = [item for item in companies if item.get("primary_source_url")]
         return RuntimeResult(
             status="success",
             output={
-                "applications_reviewed": len(applications),
-                "needs_artifacts_count": len(needs_artifacts),
+                "companies_reviewed": len(companies),
+                "needs_source_count": len(needs_source),
+                "ready_source_count": len(ready),
                 "proposals": [
                     {
-                        "decision_type": "application_prep",
-                        "question": "Review these applications that need prep artifacts?",
-                        "changes": {"application_ids": [item.get("id") for item in needs_artifacts[:20]]},
+                        "decision_type": "source_discovery",
+                        "question": "Review these companies that need a verified jobs source?",
+                        "changes": {"company_ids": [item.get("id") for item in needs_source[:20]]},
                         "applies_automatically": False,
                     }
                 ],
@@ -189,34 +190,32 @@ class LocalApplicationPrepAdapter(RuntimeAdapter):
             artifacts=[
                 {
                     "artifact_type": "markdown",
-                    "title": "Application Prep Review",
-                    "content": application_prep_markdown(active, needs_artifacts),
-                    "metadata": {"needs_artifacts": [item.get("id") for item in needs_artifacts]},
+                    "title": "Source Discovery Review",
+                    "content": source_discovery_markdown(needs_source, ready, companies),
+                    "metadata": {"needs_source_company_ids": [item.get("id") for item in needs_source]},
                 }
             ],
         )
 
 
-class LocalFollowUpAdapter(RuntimeAdapter):
-    adapter_name = "local_follow_up"
+class LocalNotificationReviewAdapter(RuntimeAdapter):
+    adapter_name = "local_notification_review"
 
     def execute(self, invocation_payload: dict) -> RuntimeResult:
-        applications = invocation_payload["context"].get("applications") or []
-        due = [
-            item
-            for item in applications
-            if item.get("status") in {"saved", "applying", "applied", "interviewing"} and (item.get("follow_up_at") or item.get("next_action"))
-        ]
+        jobs = invocation_payload["context"].get("jobs") or []
+        notify = [job for job in jobs if job.get("match", {}).get("should_notify")]
+        held = [job for job in jobs if not job.get("match", {}).get("should_notify")]
         return RuntimeResult(
             status="success",
             output={
-                "applications_reviewed": len(applications),
-                "due_count": len(due),
+                "jobs_reviewed": len(jobs),
+                "notify_count": len(notify),
+                "held_count": len(held),
                 "proposals": [
                     {
-                        "decision_type": "follow_up",
-                        "question": "Review these follow-up actions before changing Today?",
-                        "changes": {"application_ids": [item.get("id") for item in due[:20]]},
+                        "decision_type": "notification_review",
+                        "question": "Review these jobs selected for notification?",
+                        "changes": {"job_ids": [item.get("id") for item in notify[:20]]},
                         "applies_automatically": False,
                     }
                 ],
@@ -224,9 +223,9 @@ class LocalFollowUpAdapter(RuntimeAdapter):
             artifacts=[
                 {
                     "artifact_type": "markdown",
-                    "title": "Follow-Up Review",
-                    "content": follow_up_markdown(due),
-                    "metadata": {"application_ids": [item.get("id") for item in due]},
+                    "title": "Notification Review",
+                    "content": notification_review_markdown(notify, held, jobs),
+                    "metadata": {"notify_job_ids": [item.get("id") for item in notify]},
                 }
             ],
         )
@@ -271,7 +270,7 @@ def profile_recommendations(profile: dict, target_titles: list[dict], claims: li
     if not target_titles:
         recommendations.append("Generate target titles and accept the ones that reflect the search strategy.")
     if not any(claim.get("status") == "confirmed" for claim in claims):
-        recommendations.append("Confirm at least a few proof-point claims before using them in applications.")
+        recommendations.append("Confirm at least a few proof-point claims before relying on AI match explanations.")
     if not profile.get("skills"):
         recommendations.append("Add skills manually or import a resume so alerts can use profile terms.")
     if not recommendations:
@@ -334,29 +333,33 @@ def search_strategy_markdown(strategy: dict, gaps: list[str]) -> str:
     return "\n".join(lines)
 
 
-def application_prep_markdown(active: list[dict], needs_artifacts: list[dict]) -> str:
-    lines = ["# Application Prep Review", "", f"Active applications: {len(active)}", "", "## Needs Artifacts"]
-    if needs_artifacts:
-        lines.extend(f"- {item.get('job_title')} at {item.get('company')}" for item in needs_artifacts[:12])
+def source_discovery_markdown(needs_source: list[dict], ready: list[dict], companies: list[dict]) -> str:
+    lines = ["# Source Discovery Review", "", f"Companies reviewed: {len(companies)}", "", "## Needs Source Review"]
+    if needs_source:
+        lines.extend(f"- {item.get('name')} ({item.get('domain') or item.get('homepage_url') or 'no domain'})" for item in needs_source[:20])
     else:
-        lines.append("- All active applications have at least one prep artifact.")
-    lines.extend(["", "## Existing Approved Artifacts"])
-    approved = [item for item in active if item.get("approved_artifacts")]
-    if approved:
-        for item in approved[:12]:
-            lines.append(f"- {item.get('job_title')} at {item.get('company')}: {', '.join(item.get('approved_artifacts'))}")
+        lines.append("- All active companies have usable sources.")
+    lines.extend(["", "## Ready Sources"])
+    if ready:
+        lines.extend(f"- {item.get('name')}: {item.get('primary_source_url')}" for item in ready[:20])
     else:
-        lines.append("- No approved artifacts yet.")
+        lines.append("- No ready sources yet.")
     return "\n".join(lines)
 
 
-def follow_up_markdown(due: list[dict]) -> str:
-    lines = ["# Follow-Up Review", ""]
-    if due:
-        for item in due[:20]:
-            action = item.get("next_action") or "Review next step"
-            date = item.get("follow_up_at") or "No date"
-            lines.append(f"- {item.get('job_title')} at {item.get('company')}: {action} ({date})")
+def notification_review_markdown(notify: list[dict], held: list[dict], jobs: list[dict]) -> str:
+    lines = ["# Notification Review", "", f"Jobs reviewed: {len(jobs)}", "", "## Notify"]
+    if notify:
+        for item in notify[:20]:
+            match = item.get("match") or {}
+            lines.append(f"- {item.get('title')} at {item.get('company')} ({match.get('overall_score', 0)}%, confidence {match.get('confidence_score', 0)}%)")
     else:
-        lines.append("- No due follow-up actions found.")
+        lines.append("- No jobs currently clear notification thresholds.")
+    lines.extend(["", "## Held"])
+    if held:
+        for item in held[:20]:
+            match = item.get("match") or {}
+            lines.append(f"- {item.get('title')} at {item.get('company')}: score {match.get('overall_score', 0)}, threshold {match.get('notification_threshold', 0)}")
+    else:
+        lines.append("- No held jobs in this review.")
     return "\n".join(lines)

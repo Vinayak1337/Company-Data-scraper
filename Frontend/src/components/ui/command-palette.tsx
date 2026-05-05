@@ -4,13 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
-  ChartNoAxesCombined,
-  Cpu,
-  FileDown,
   ListChecks,
+  Mail,
   Search,
   Settings,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,15 +16,11 @@ const commands = [
   { href: "/", label: "Go to Today", group: "Navigate", icon: ListChecks },
   { href: "/companies", label: "Go to Companies", group: "Navigate", icon: Building2 },
   { href: "/jobs", label: "Go to Jobs", group: "Navigate", icon: Search },
-  { href: "/applications", label: "Go to Applications", group: "Navigate", icon: ListChecks },
   { href: "/profile", label: "Go to Profile", group: "Navigate", icon: UserRound },
-  { href: "/analytics", label: "Go to Analytics", group: "Navigate", icon: ChartNoAxesCombined },
-  { href: "/agents", label: "Go to Agents", group: "Navigate", icon: Cpu },
   { href: "/settings", label: "Go to Settings", group: "Navigate", icon: Settings },
-  { href: "/companies", label: "Add company", group: "Actions", icon: Building2 },
-  { href: "/jobs", label: "Paste URL to discovery inbox", group: "Actions", icon: Search },
-  { href: "/analytics", label: "Generate weekly review", group: "Actions", icon: Sparkles },
-  { href: "/settings?tab=ownership&export=1", label: "Export workspace JSON", group: "Actions", icon: FileDown },
+  { href: "/companies", label: "Import company CSV", group: "Actions", icon: Building2 },
+  { href: "/jobs", label: "Review matches", group: "Actions", icon: Search },
+  { href: "/settings?tab=notifications", label: "Tune notification thresholds", group: "Actions", icon: Mail },
 ];
 
 export function CommandPalette() {

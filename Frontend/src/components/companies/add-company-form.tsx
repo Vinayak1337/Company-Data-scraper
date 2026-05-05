@@ -10,11 +10,11 @@ export function AddCompanyForm({ action }: AddCompanyFormProps) {
   return (
     <PageSection
       title="Add company"
-      description="Track a careers URL from Greenhouse, Lever, Ashby, Microsoft Careers, or a generic jobs page."
+      description="Add a company by name/domain and let source discovery find the jobs page, or paste a known careers URL."
     >
       <form
         action={action}
-        className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_150px_auto] sm:items-end"
+        className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_150px_auto] sm:items-end"
       >
         <label className="min-w-0">
           <span className="text-xs font-medium text-[var(--muted)]">Company name</span>
@@ -26,11 +26,19 @@ export function AddCompanyForm({ action }: AddCompanyFormProps) {
         </label>
 
         <label className="min-w-0">
+          <span className="text-xs font-medium text-[var(--muted)]">Domain</span>
+          <Input
+            name="domain"
+            type="text"
+            placeholder="example.com"
+          />
+        </label>
+
+        <label className="min-w-0">
           <span className="text-xs font-medium text-[var(--muted)]">Careers URL</span>
           <Input
             name="careers_url"
             type="url"
-            required
             placeholder="https://jobs.lever.co/example"
           />
         </label>

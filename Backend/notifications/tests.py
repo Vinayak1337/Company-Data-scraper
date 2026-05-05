@@ -1,91 +1,116 @@
-from unittest.mock import patch
-
-import requests
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from companies.models import Company, ScanJob
-from companies.services import create_new_role_alerts
+from companies.models import Company
 from jobs.models import Job
-from notifications.mteane import publish_mteane_event, redact_payload
+from matching.models import JobMatch
+from notifications.models import NotificationPreference
+from notifications.services import (
+    create_notification_event,
+    notification_preferences_status,
+    send_queued_notification_events,
+)
 
 
-class MteaneIntegrationTests(TestCase):
-    @patch("notifications.mteane.requests.post")
-    def test_mteane_disabled_is_noop(self, mock_post):
-        result = publish_mteane_event("job.new_role", {"job_title": "Engineer"})
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class NotificationEmailTests(TestCase):
+    def setUp(self):
+        mail.outbox = []
 
-        self.assertFalse(result.delivered)
-        self.assertEqual(result.status, "disabled")
-        mock_post.assert_not_called()
-
-    @override_settings(MTEANE_ENABLED=True, MTEANE_API_URL="http://mteane:3000", MTEANE_API_KEY="test-key")
-    @patch("notifications.mteane.requests.post")
-    def test_mteane_publisher_sends_safe_event(self, mock_post):
-        mock_post.return_value.status_code = 200
-
-        result = publish_mteane_event(
-            "job.new_role",
-            {
-                "job_title": "Backend Engineer",
-                "resume_text": "private",
-                "nested": {"api_key": "secret", "safe": "value"},
-            },
-            idempotency_key="alert-1",
+    def test_immediate_match_notification_sends_email(self):
+        match = self.create_match()
+        NotificationPreference.objects.create(
+            digest_channel="email",
+            email_address="user@example.com",
+            immediate_email_enabled=True,
+            digest_enabled=True,
         )
 
-        self.assertTrue(result.delivered)
-        _, kwargs = mock_post.call_args
-        self.assertEqual(kwargs["headers"]["x-api-key"], "test-key")
-        self.assertEqual(kwargs["json"]["event_type"], "job.new_role")
-        self.assertEqual(kwargs["json"]["idempotency_key"], "alert-1")
-        self.assertEqual(kwargs["json"]["payload"]["resume_text"], "[redacted]")
-        self.assertEqual(kwargs["json"]["payload"]["nested"]["api_key"], "[redacted]")
-        self.assertEqual(kwargs["json"]["payload"]["nested"]["safe"], "value")
+        event = create_notification_event(match)
 
-    @override_settings(MTEANE_ENABLED=True, MTEANE_API_URL="http://mteane:3000", MTEANE_API_KEY="test-key")
-    @patch("notifications.mteane.requests.post")
-    def test_mteane_publisher_fails_open_on_timeout(self, mock_post):
-        mock_post.side_effect = requests.Timeout("slow")
+        self.assertEqual(event.channel, "email")
+        self.assertEqual(event.status, "sent")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("85% match", mail.outbox[0].subject)
+        self.assertIn(match.job.apply_url, mail.outbox[0].body)
 
-        result = publish_mteane_event("scan.failed", {"company_name": "Acme"})
-
-        self.assertFalse(result.delivered)
-        self.assertEqual(result.status, "request_failed")
-
-    def test_payload_redaction_is_recursive(self):
-        payload = redact_payload({"safe": "yes", "items": [{"token": "secret"}, {"name": "ok"}]})
-
-        self.assertEqual(payload["safe"], "yes")
-        self.assertEqual(payload["items"][0]["token"], "[redacted]")
-        self.assertEqual(payload["items"][1]["name"], "ok")
-
-    @patch("companies.services.publish_mteane_event")
-    def test_new_role_alert_emits_mteane_event_without_description(self, mock_publish):
-        company = Company.objects.create(name="Acme", careers_url="https://jobs.lever.co/acme", scraper_type="lever")
-        scan_job = ScanJob.objects.create(
-            company=company,
-            status="running",
-            started_at=timezone.now(),
-            jobs_created=1,
+    def test_email_without_address_is_skipped(self):
+        match = self.create_match()
+        NotificationPreference.objects.create(
+            digest_channel="email",
+            immediate_email_enabled=True,
+            digest_enabled=True,
         )
+
+        event = create_notification_event(match)
+
+        self.assertEqual(event.status, "skipped")
+        self.assertEqual(event.skipped_reason, "No notification email address is configured.")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_quiet_hours_keeps_email_queued(self):
+        match = self.create_match()
+        NotificationPreference.objects.create(
+            digest_channel="email",
+            email_address="user@example.com",
+            immediate_email_enabled=True,
+            quiet_hours_enabled=True,
+            quiet_hours_start=timezone.localtime().time().replace(second=0, microsecond=0),
+            quiet_hours_end=timezone.localtime().time().replace(second=0, microsecond=0),
+        )
+
+        event = create_notification_event(match)
+
+        self.assertEqual(event.status, "queued")
+        self.assertIn("Quiet hours", event.skipped_reason)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_send_queued_notification_events_sends_pending_email(self):
+        match = self.create_match()
+        NotificationPreference.objects.create(
+            digest_channel="email",
+            email_address="user@example.com",
+            immediate_email_enabled=False,
+            digest_enabled=True,
+        )
+        event = create_notification_event(match)
+        self.assertEqual(event.status, "queued")
+
+        result = send_queued_notification_events(limit=5)
+
+        event.refresh_from_db()
+        self.assertEqual(result["sent"], 1)
+        self.assertEqual(event.status, "sent")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_notification_status_requires_delivery_channel(self):
+        preference = NotificationPreference.objects.create(digest_enabled=True, digest_channel="email")
+        self.assertFalse(notification_preferences_status(preference)["configured"])
+
+        preference.email_address = "user@example.com"
+        preference.save(update_fields=["email_address"])
+
+        self.assertTrue(notification_preferences_status(preference)["configured"])
+
+    def create_match(self) -> JobMatch:
+        company = Company.objects.create(name="Acme", domain="acme.test", careers_url="https://acme.test/jobs")
         job = Job.objects.create(
             company=company,
             title="Backend Engineer",
-            description="Should not be sent to MTEANE.",
+            description="Python and Django role.",
             location="Remote",
-            apply_url="https://jobs.lever.co/acme/backend",
-            source_url=company.careers_url,
-            source_platform="lever",
+            apply_url="https://acme.test/jobs/backend",
+            source_url="https://acme.test/jobs",
+            source_platform="generic",
             first_seen_at=timezone.now(),
         )
-
-        created_count = create_new_role_alerts(scan_job)
-
-        self.assertEqual(created_count, 1)
-        mock_publish.assert_called_once()
-        event_type, payload = mock_publish.call_args.args[:2]
-        self.assertEqual(event_type, "job.new_role")
-        self.assertEqual(payload["job_id"], job.id)
-        self.assertEqual(payload["job_title"], "Backend Engineer")
-        self.assertNotIn("description", payload)
+        return JobMatch.objects.create(
+            job=job,
+            overall_score=85,
+            confidence_score=77,
+            apply_priority="apply_now",
+            should_notify=True,
+            reasons_to_apply=["Python and Django match the profile."],
+            reasons_to_skip=["Compensation not listed."],
+        )
