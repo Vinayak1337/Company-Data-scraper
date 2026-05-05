@@ -1,0 +1,364 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="light"] {
+  --bg: #faf8f4;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f3f0ea;
+  --bg-hover: #f0ece4;
+  --bg-active: #e8e3d8;
+  --ink: #1a1815;
+  --ink-2: #4a463f;
+  --ink-3: #807a6f;
+  --ink-4: #b5ae9f;
+  --line: #e8e3d8;
+  --line-strong: #d8d2c2;
+  --accent: #3b5fa8;
+  --accent-soft: #e8edf6;
+  --accent-ink: #2a4884;
+  --ok: #2d6a4f;
+  --ok-soft: #e3eee6;
+  --warn: #a86a1f;
+  --warn-soft: #f5ebd9;
+  --danger: #9b2f2f;
+  --danger-soft: #f3e0de;
+  --info: #3b5fa8;
+  --info-soft: #e8edf6;
+  --font-app-serif: var(--font-app-source-serif), "Source Serif 4", "Source Serif Pro", Georgia, serif;
+  --font-app-sans: var(--font-app-inter), "Inter", "Sohne", system-ui, -apple-system, sans-serif;
+  --font-app-mono: var(--font-app-jetbrains-mono), "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --surface: var(--bg-raised);
+  --surface-raised: var(--bg-raised);
+  --surface-recessed: var(--bg-sunken);
+  --surface-hover: var(--bg-hover);
+  --bg-shell: var(--bg);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --faint: var(--ink-3);
+  --primary: var(--accent);
+  --primary-strong: var(--accent-ink);
+  --success: var(--ok);
+  --warning: var(--warn);
+  --info: var(--accent);
+  --ring: var(--accent-soft);
+  --background: var(--bg);
+  --foreground: var(--text);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #15140f;
+  --bg-raised: #1d1c17;
+  --bg-sunken: #100f0b;
+  --bg-hover: #25241e;
+  --bg-active: #2d2c25;
+  --ink: #f5f1e8;
+  --ink-2: #d6d0c2;
+  --ink-3: #8a8377;
+  --ink-4: #4f4a3f;
+  --line: #2a2822;
+  --line-strong: #3a372f;
+  --accent: #8aa6e0;
+  --accent-soft: #1f2740;
+  --accent-ink: #b8c8ed;
+  --ok: #7fc09b;
+  --ok-soft: #1d2b22;
+  --warn: #d6a45c;
+  --warn-soft: #2e2418;
+  --danger: #d68080;
+  --danger-soft: #2e1e1e;
+  --info: #8aa6e0;
+  --info-soft: #1f2740;
+  --font-app-serif: var(--font-app-source-serif), "Source Serif 4", "Source Serif Pro", Georgia, serif;
+  --font-app-sans: var(--font-app-inter), "Inter", "Sohne", system-ui, -apple-system, sans-serif;
+  --font-app-mono: var(--font-app-jetbrains-mono), "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --surface: var(--bg-raised);
+  --surface-raised: var(--bg-raised);
+  --surface-recessed: var(--bg-sunken);
+  --surface-hover: var(--bg-hover);
+  --bg-shell: var(--bg);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --faint: var(--ink-3);
+  --primary: var(--accent);
+  --primary-strong: var(--accent-ink);
+  --success: var(--ok);
+  --warning: var(--warn);
+  --info: var(--accent);
+  --ring: var(--accent-soft);
+  --background: var(--bg);
+  --foreground: var(--text);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-app-sans);
+  --font-serif: var(--font-app-serif);
+  --font-mono: var(--font-app-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--bg);
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-app-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  color-scheme: inherit;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 32%, transparent);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.console-grid-bg {
+  background: var(--bg);
+}
+
+.console-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+}
+
+.console-recessed {
+  border: 1px solid var(--border);
+  background: var(--surface-recessed);
+  border-radius: 3px;
+}
+
+.console-label {
+  color: var(--faint);
+  font-family: var(--font-app-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.t-num,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Compatibility layer for route code that still uses Tailwind slate/white classes. */
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-slate-900 {
+  background-color: var(--surface) !important;
+}
+
+.bg-slate-950 {
+  background-color: var(--surface-recessed) !important;
+}
+
+.bg-slate-800,
+.bg-slate-700 {
+  background-color: var(--surface-hover) !important;
+}
+
+.bg-indigo-500\/10,
+.bg-indigo-500\/15,
+.bg-indigo-500\/20,
+.bg-indigo-400\/10 {
+  background-color: color-mix(in srgb, var(--primary) 14%, transparent) !important;
+}
+
+.bg-indigo-500\/30 {
+  background-color: color-mix(in srgb, var(--primary) 24%, transparent) !important;
+}
+
+.bg-emerald-50,
+.bg-emerald-400\/10 {
+  background-color: color-mix(in srgb, var(--success) 12%, transparent) !important;
+}
+
+.bg-amber-50,
+.bg-amber-400\/10 {
+  background-color: color-mix(in srgb, var(--warning) 13%, transparent) !important;
+}
+
+.bg-rose-50,
+.bg-rose-400\/10 {
+  background-color: color-mix(in srgb, var(--danger) 13%, transparent) !important;
+}
+
+.bg-cyan-50,
+.bg-cyan-400\/10 {
+  background-color: color-mix(in srgb, var(--info) 12%, transparent) !important;
+}
+
+.border-slate-100,
+.border-slate-200,
+.border-slate-300,
+.border-slate-700,
+.border-slate-800,
+.divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border) !important;
+}
+
+.border-indigo-300,
+.border-indigo-400\/30,
+.border-indigo-400\/40 {
+  border-color: color-mix(in srgb, var(--primary) 48%, transparent) !important;
+}
+
+.border-emerald-200,
+.border-emerald-400\/30 {
+  border-color: color-mix(in srgb, var(--success) 36%, transparent) !important;
+}
+
+.border-amber-200,
+.border-amber-400\/30 {
+  border-color: color-mix(in srgb, var(--warning) 38%, transparent) !important;
+}
+
+.border-rose-200,
+.border-rose-300,
+.border-rose-400\/30 {
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent) !important;
+}
+
+.border-cyan-200,
+.border-cyan-400\/30 {
+  border-color: color-mix(in srgb, var(--info) 36%, transparent) !important;
+}
+
+.text-white,
+.text-slate-50,
+.text-slate-100,
+.text-slate-200,
+.text-slate-950,
+.text-slate-900,
+.text-slate-800 {
+  color: var(--text) !important;
+}
+
+.text-slate-700,
+.text-slate-600,
+.text-slate-500,
+.text-slate-400,
+.text-slate-300 {
+  color: var(--muted) !important;
+}
+
+.text-slate-600,
+.text-slate-500 {
+  color: var(--faint) !important;
+}
+
+.text-indigo-100,
+.text-indigo-200,
+.text-indigo-300 {
+  color: var(--primary) !important;
+}
+
+.text-cyan-300,
+.text-cyan-700,
+.text-cyan-900 {
+  color: var(--info) !important;
+}
+
+.text-emerald-300,
+.text-emerald-700,
+.text-emerald-800 {
+  color: var(--success) !important;
+}
+
+.text-amber-300,
+.text-amber-700,
+.text-amber-800 {
+  color: var(--warning) !important;
+}
+
+.text-rose-300,
+.text-rose-700,
+.text-rose-800,
+.text-rose-900,
+.text-rose-950 {
+  color: var(--danger) !important;
+}
+
+.placeholder\:text-slate-400::placeholder,
+.placeholder\:text-slate-500::placeholder,
+.placeholder\:text-slate-600::placeholder {
+  color: var(--faint) !important;
+}
+
+.hover\:bg-white:hover,
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-50\/70:hover,
+.hover\:bg-slate-100:hover,
+.hover\:bg-slate-800:hover,
+.hover\:bg-slate-800\/70:hover,
+.hover\:bg-slate-900:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.hover\:text-indigo-200:hover,
+.hover\:text-cyan-700:hover {
+  color: var(--primary) !important;
+}
+
+.focus\:border-slate-500:focus,
+.focus\:border-indigo-500:focus,
+.focus\:border-indigo-300:focus,
+.focus\:border-rose-500:focus {
+  border-color: var(--primary) !important;
+}
+
+.focus\:ring-slate-100:focus,
+.focus\:ring-slate-200:focus,
+.focus\:ring-slate-300:focus,
+.focus\:ring-indigo-300\/20:focus,
+.focus\:ring-indigo-500:focus,
+.focus\:ring-rose-100:focus {
+  --tw-ring-color: var(--ring) !important;
+}

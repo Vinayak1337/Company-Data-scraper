@@ -1,0 +1,205 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-job_scout}
+      POSTGRES_USER: ${POSTGRES_USER:-job_scout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_scout}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - job-scout-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-job_scout} -d ${POSTGRES_DB:-job_scout}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    command: sh -c "python manage.py migrate --no-input && gunicorn jobhunt.wsgi:application --bind 0.0.0.0:$${PORT:-8000}"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      TIME_ZONE: ${TIME_ZONE:-UTC}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
+      DATABASE_SSLMODE: disable
+      JOB_SCOUT_REQUIRE_AUTH: ${JOB_SCOUT_REQUIRE_AUTH:-False}
+      JOB_SCOUT_API_TOKEN: ${JOB_SCOUT_API_TOKEN:-}
+      AGENT_EXECUTION_MODE: ${AGENT_EXECUTION_MODE:-queued}
+      AGENT_QUEUE_BATCH_SIZE: ${AGENT_QUEUE_BATCH_SIZE:-5}
+      SCRAPER_TIMEOUT_SECONDS: ${SCRAPER_TIMEOUT_SECONDS:-20}
+      SCANNER_ENABLED: ${SCANNER_ENABLED:-True}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-False}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-job-scout-v2}
+      MTEANE_ENABLED: ${MTEANE_ENABLED:-False}
+      MTEANE_API_URL: ${MTEANE_API_URL:-}
+      MTEANE_API_KEY: ${MTEANE_API_KEY:-}
+      MTEANE_TIMEOUT_SECONDS: ${MTEANE_TIMEOUT_SECONDS:-3}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  scanner:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    command: sh -c "while true; do python manage.py scan_due_companies --limit $${SCAN_BATCH_LIMIT:-25}; sleep $${SCAN_INTERVAL_SECONDS:-3600}; done"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      TIME_ZONE: ${TIME_ZONE:-UTC}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
+      DATABASE_SSLMODE: disable
+      SCRAPER_TIMEOUT_SECONDS: ${SCRAPER_TIMEOUT_SECONDS:-20}
+      SCAN_BATCH_LIMIT: ${SCAN_BATCH_LIMIT:-25}
+      SCAN_INTERVAL_SECONDS: ${SCAN_INTERVAL_SECONDS:-3600}
+      MTEANE_ENABLED: ${MTEANE_ENABLED:-False}
+      MTEANE_API_URL: ${MTEANE_API_URL:-}
+      MTEANE_API_KEY: ${MTEANE_API_KEY:-}
+      MTEANE_TIMEOUT_SECONDS: ${MTEANE_TIMEOUT_SECONDS:-3}
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  agent-worker:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    command: sh -c "while true; do python manage.py process_agent_queue --limit $${AGENT_QUEUE_BATCH_SIZE:-5}; sleep $${AGENT_WORKER_POLL_SECONDS:-30}; done"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      TIME_ZONE: ${TIME_ZONE:-UTC}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
+      DATABASE_SSLMODE: disable
+      AGENT_EXECUTION_MODE: ${AGENT_EXECUTION_MODE:-queued}
+      AGENT_QUEUE_BATCH_SIZE: ${AGENT_QUEUE_BATCH_SIZE:-5}
+      AGENT_WORKER_POLL_SECONDS: ${AGENT_WORKER_POLL_SECONDS:-30}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-False}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-job-scout-v2}
+      MTEANE_ENABLED: ${MTEANE_ENABLED:-False}
+      MTEANE_API_URL: ${MTEANE_API_URL:-}
+      MTEANE_API_KEY: ${MTEANE_API_KEY:-}
+      MTEANE_TIMEOUT_SECONDS: ${MTEANE_TIMEOUT_SECONDS:-3}
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  mteane-postgres:
+    image: postgres:15-alpine
+    profiles: ["mteane"]
+    environment:
+      POSTGRES_DB: ${MTEANE_POSTGRES_DB:-triggrr}
+      POSTGRES_USER: ${MTEANE_POSTGRES_USER:-triggrr}
+      POSTGRES_PASSWORD: ${MTEANE_POSTGRES_PASSWORD:-triggrr}
+    volumes:
+      - mteane-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MTEANE_POSTGRES_USER:-triggrr} -d ${MTEANE_POSTGRES_DB:-triggrr}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mteane-redis:
+    image: redis:7-alpine
+    profiles: ["mteane"]
+    volumes:
+      - mteane-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mteane-api:
+    profiles: ["mteane"]
+    build:
+      context: ./integrations/mteane
+      dockerfile: Dockerfile.api
+    command: sh -c "node dist/db/migrate.js && node dist/index.js"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${MTEANE_POSTGRES_USER:-triggrr}:${MTEANE_POSTGRES_PASSWORD:-triggrr}@mteane-postgres:5432/${MTEANE_POSTGRES_DB:-triggrr}
+      REDIS_URL: redis://mteane-redis:6379
+      API_KEY_SECRET: ${MTEANE_API_KEY_SECRET:-dev-only-change-me-generate-a-real-secret}
+      LOG_LEVEL: ${MTEANE_LOG_LEVEL:-info}
+      SMTP_HOST: ${MTEANE_SMTP_HOST:-}
+      SMTP_PORT: ${MTEANE_SMTP_PORT:-1025}
+      SMTP_USER: ${MTEANE_SMTP_USER:-}
+      SMTP_PASS: ${MTEANE_SMTP_PASS:-}
+      SMTP_FROM: ${MTEANE_SMTP_FROM:-noreply@example.local}
+    ports:
+      - "${MTEANE_PORT:-3001}:3000"
+    depends_on:
+      mteane-postgres:
+        condition: service_healthy
+      mteane-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
+
+  mteane-worker:
+    profiles: ["mteane"]
+    build:
+      context: ./integrations/mteane
+      dockerfile: Dockerfile.worker
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${MTEANE_POSTGRES_USER:-triggrr}:${MTEANE_POSTGRES_PASSWORD:-triggrr}@mteane-postgres:5432/${MTEANE_POSTGRES_DB:-triggrr}
+      REDIS_URL: redis://mteane-redis:6379
+      API_KEY_SECRET: ${MTEANE_API_KEY_SECRET:-dev-only-change-me-generate-a-real-secret}
+      WORKER_CONCURRENCY: ${MTEANE_WORKER_CONCURRENCY:-5}
+      LOG_LEVEL: ${MTEANE_LOG_LEVEL:-info}
+      SMTP_HOST: ${MTEANE_SMTP_HOST:-}
+      SMTP_PORT: ${MTEANE_SMTP_PORT:-1025}
+      SMTP_USER: ${MTEANE_SMTP_USER:-}
+      SMTP_PASS: ${MTEANE_SMTP_PASS:-}
+      SMTP_FROM: ${MTEANE_SMTP_FROM:-noreply@example.local}
+    depends_on:
+      mteane-api:
+        condition: service_healthy
+
+volumes:
+  job-scout-postgres:
+  mteane-postgres:
+  mteane-redis:
