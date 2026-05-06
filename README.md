@@ -31,36 +31,34 @@ V3 focuses on one useful loop:
 - Notification preferences for email address, immediate/digest delivery, minimum score, and minimum confidence.
 - Agent provider settings and local deterministic agent reviews for source discovery, match review, and notification review.
 
-## Backend Local Setup
+## Local Setup
 
 ```bash
-cd Backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-../scripts/job-scout setup
-python manage.py runserver
+./jobscout init
+./jobscout dev
 ```
 
-The backend API defaults to `http://127.0.0.1:8000/api`.
-
-Local setup can also be driven directly from the project root:
+The root `jobscout` command manages both `Backend/` and `Frontend/`.
+Use `./jobscout ...` from the repo root, or `jobscout ...` if the repo root is on your `PATH`.
 
 ```bash
-./scripts/job-scout status
-./scripts/job-scout providers
-./scripts/job-scout setup --resume-file resume.md --watchlist-csv companies.csv
-./scripts/job-scout import-watchlist --csv companies.csv
-./scripts/job-scout run-once --force
+./jobscout status
+./jobscout providers
+./jobscout setup --resume-file resume.md --watchlist-csv companies.csv
+./jobscout import-watchlist --csv companies.csv
+./jobscout run-once --force
+./jobscout backend
+./jobscout frontend
 ```
 
-Provider setup is terminal-only. `./scripts/job-scout providers` opens a numbered selector, writes `Backend/.env`, and marks the selected provider as the local Job Scout brain. CLI-based providers are local-only because they require terminal login state:
+The backend API defaults to `http://127.0.0.1:8000/api`; the frontend defaults to `http://127.0.0.1:3000`.
+
+Provider setup is terminal-only. `./jobscout providers` opens a numbered selector, writes `Backend/.env`, and marks the selected provider as the local Job Scout brain. CLI-based providers are local-only because they require terminal login state:
 
 ```bash
-./scripts/job-scout providers --provider gemini_cli
-./scripts/job-scout providers --provider claude_code_cli
-./scripts/job-scout providers --provider codex_cli
+./jobscout providers --provider gemini_cli
+./jobscout providers --provider claude_code_cli
+./jobscout providers --provider codex_cli
 ```
 
 Local email defaults to Django's console backend. Configure SMTP for real delivery:
@@ -75,7 +73,7 @@ EMAIL_HOST_PASSWORD=...
 DEFAULT_FROM_EMAIL="Job Scout <jobs@example.com>"
 ```
 
-## Frontend Local Setup
+## Manual Frontend Local Setup
 
 ```bash
 cd Frontend

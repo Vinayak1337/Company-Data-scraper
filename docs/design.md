@@ -197,7 +197,7 @@ The crawler should not directly notify the user. It should create/update jobs an
 For V3, the authoritative recurring workflow is a terminal command:
 
 ```bash
-./scripts/job-scout run-once --force
+./jobscout run-once --force
 ```
 
 That command is the bridge between local setup and any future hosted scheduler. UptimeRobot, cron, or background workers should call equivalent server behavior only after the local command proves the crawl, match, notification, and email path.
@@ -210,10 +210,10 @@ Rules:
 
 - `gemini_cli`, `claude_code_cli`, and `opencode` are local-only.
 - `codex_cli` is also supported as a local-only brain provider.
-- They are configured through `./scripts/job-scout providers`, which writes `Backend/.env`.
+- They are configured through `./jobscout providers`, which writes `Backend/.env`.
 - They should never be enabled in `JOB_SCOUT_RUNTIME_ENV=hosted`.
 - The web app can display their readiness, but it should not imply they can run on hosted Render/web services.
-- Setup is done from the terminal with `./scripts/job-scout setup`.
+- Setup is done from the terminal with `./jobscout setup`.
 
 ### Matching
 

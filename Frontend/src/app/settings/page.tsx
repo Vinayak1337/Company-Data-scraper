@@ -114,11 +114,11 @@ function AiSettings({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <PageSection
         title="Providers"
-        description="Provider setup is terminal-only. Use ./scripts/job-scout providers to select the project brain and write Backend/.env."
+        description="Provider setup is terminal-only. Use ./jobscout providers to select the project brain and write Backend/.env."
       >
         <div className="space-y-4 p-4">
           <div className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-3 font-mono text-xs text-[var(--ink-2)]">
-            ./scripts/job-scout providers
+            ./jobscout providers
           </div>
           <ProviderGroup
             icon={<Cpu className="h-4 w-4" aria-hidden />}

@@ -27,7 +27,7 @@ Required setup:
 - AI runtime: provider, model, key/env readiness, run limits, consent requirement, and whether the provider is local-only. Provider setup belongs to the terminal CLI, not Settings.
 - Notification settings: email address, digest frequency, minimum match score, confidence threshold, quiet hours.
 
-The app can show data before setup is complete, but recurring matching and notifications should remain disabled until the required setup gates pass. V3 starts local-first: `./scripts/job-scout setup` collects setup data, `./scripts/job-scout providers` chooses the local brain provider and writes `Backend/.env`, and the web UI only reports provider readiness before the app is treated as production-ready.
+The app can show data before setup is complete, but recurring matching and notifications should remain disabled until the required setup gates pass. V3 starts local-first: `./jobscout setup` collects setup data, `./jobscout providers` chooses the local brain provider and writes `Backend/.env`, and the web UI only reports provider readiness before the app is treated as production-ready.
 
 ### 2. Company Watchlist Import
 
@@ -79,7 +79,7 @@ A terminal command runs due active companies:
 The command path is local-first:
 
 ```bash
-./scripts/job-scout run-once --force
+./jobscout run-once --force
 python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
 ```
 

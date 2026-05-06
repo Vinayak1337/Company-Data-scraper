@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$ROOT_DIR/Backend"
+FRONTEND_DIR="$ROOT_DIR/Frontend"
+BACKEND_PY="$BACKEND_DIR/.venv/bin/python"
+BACKEND_API_BASE_URL="${BACKEND_API_BASE_URL:-http://127.0.0.1:8000/api}"
+
+usage() {
+  cat <<'EOF'
+Job Scout local workspace CLI
+
+Usage:
+  ./jobscout init [--non-interactive] [--skip-install] [--skip-provider]
+  ./jobscout providers [provider options]
+  ./jobscout status
+  ./jobscout setup [setup options]
+  ./jobscout import-watchlist --csv companies.csv
+  ./jobscout run-once [--force]
+  ./jobscout backend [--host 127.0.0.1] [--port 8000]
+  ./jobscout frontend [--host 127.0.0.1] [--port 3000]
+  ./jobscout dev
+
+Root command for managing both Backend and Frontend locally.
+Provider setup is terminal-only and is delegated to Django after init.
+EOF
+}
+
+ensure_backend_env() {
+  if [[ ! -f "$BACKEND_DIR/.env" ]]; then
+    cp "$BACKEND_DIR/.env.example" "$BACKEND_DIR/.env"
+    echo "Created Backend/.env"
+  fi
+}
+
+ensure_frontend_env() {
+  local target="$FRONTEND_DIR/.env.local"
+  if [[ ! -f "$target" ]]; then
+    {
+      echo "BACKEND_API_BASE_URL=$BACKEND_API_BASE_URL"
+      echo "BACKEND_API_TOKEN="
+      echo "NEXT_TELEMETRY_DISABLED=1"
+    } > "$target"
+    echo "Created Frontend/.env.local"
+  fi
+}
+
+ensure_backend_venv() {
+  if [[ ! -x "$BACKEND_PY" ]]; then
+    echo "Creating Backend/.venv"
+    python3 -m venv "$BACKEND_DIR/.venv"
+  fi
+}
+
+install_backend() {
+  ensure_backend_venv
+  "$BACKEND_PY" -m pip install -r "$BACKEND_DIR/requirements.txt"
+}
+
+install_frontend() {
+  if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
+    npm --prefix "$FRONTEND_DIR" install
+  else
+    echo "Frontend/node_modules already exists"
+  fi
+}
+
+backend_manage() {
+  ensure_backend_venv
+  (cd "$BACKEND_DIR" && "$BACKEND_PY" manage.py "$@")
+}
+
+job_scout_backend_cli() {
+  "$ROOT_DIR/scripts/job-scout" "$@"
+}
+
+init_workspace() {
+  local skip_install=0
+  local skip_provider=0
+  local non_interactive=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skip-install)
+        skip_install=1
+        shift
+        ;;
+      --skip-provider)
+        skip_provider=1
+        shift
+        ;;
+      --non-interactive)
+        non_interactive=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        echo "Unknown init option: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+
+  ensure_backend_env
+  ensure_frontend_env
+  ensure_backend_venv
+
+  if [[ "$skip_install" -eq 0 ]]; then
+    install_backend
+    install_frontend
+  fi
+
+  backend_manage migrate
+
+  if [[ "$skip_provider" -eq 0 ]]; then
+    if [[ "$non_interactive" -eq 1 ]]; then
+      job_scout_backend_cli providers --provider direct_api --non-interactive
+    else
+      job_scout_backend_cli providers
+    fi
+  fi
+
+  job_scout_backend_cli status
+
+  cat <<EOF
+
+Local init complete.
+
+Start both apps:
+  ./jobscout dev
+
+Or start them separately:
+  ./jobscout backend
+  ./jobscout frontend
+EOF
+}
+
+run_backend_server() {
+  local host="127.0.0.1"
+  local port="8000"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:?--host requires a value}"
+        shift 2
+        ;;
+      --port)
+        port="${2:?--port requires a value}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown backend option: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+  backend_manage runserver "$host:$port"
+}
+
+run_frontend_server() {
+  local host="127.0.0.1"
+  local port="3000"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:?--host requires a value}"
+        shift 2
+        ;;
+      --port)
+        port="${2:?--port requires a value}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown frontend option: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+  ensure_frontend_env
+  BACKEND_API_BASE_URL="$BACKEND_API_BASE_URL" npm --prefix "$FRONTEND_DIR" run dev -- --hostname "$host" --port "$port"
+}
+
+run_dev() {
+  ensure_backend_env
+  ensure_frontend_env
+  ensure_backend_venv
+  backend_manage migrate
+
+  (cd "$BACKEND_DIR" && "$BACKEND_PY" manage.py runserver 127.0.0.1:8000) &
+  local backend_pid=$!
+  (cd "$FRONTEND_DIR" && BACKEND_API_BASE_URL="$BACKEND_API_BASE_URL" npm run dev -- --hostname 127.0.0.1 --port 3000) &
+  local frontend_pid=$!
+
+  trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true' INT TERM EXIT
+  echo "Backend:  http://127.0.0.1:8000/api"
+  echo "Frontend: http://127.0.0.1:3000"
+  wait "$backend_pid" "$frontend_pid"
+}
+
+command="${1:-help}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+case "$command" in
+  init)
+    init_workspace "$@"
+    ;;
+  providers|status|setup|import-watchlist|run-once)
+    job_scout_backend_cli "$command" "$@"
+    ;;
+  backend)
+    run_backend_server "$@"
+    ;;
+  frontend)
+    run_frontend_server "$@"
+    ;;
+  dev)
+    run_dev "$@"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown command: $command" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

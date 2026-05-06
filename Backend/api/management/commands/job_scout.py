@@ -365,11 +365,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"  {metadata['setup_hint']}")
         self.stdout.write("")
         self.stdout.write("Useful commands:")
-        self.stdout.write("  ./scripts/job-scout providers")
-        self.stdout.write("  ./scripts/job-scout setup")
-        self.stdout.write("  ./scripts/job-scout import-watchlist --csv companies.csv")
-        self.stdout.write("  ./scripts/job-scout run-once --force")
-        self.stdout.write("  ./scripts/job-scout providers --provider gemini_cli")
+        self.stdout.write("  ./jobscout init")
+        self.stdout.write("  ./jobscout providers")
+        self.stdout.write("  ./jobscout setup")
+        self.stdout.write("  ./jobscout import-watchlist --csv companies.csv")
+        self.stdout.write("  ./jobscout run-once --force")
 
     def prompt(self, label: str, default: str = "", required: bool = False) -> str:
         suffix = f" [{default}]" if default else ""
