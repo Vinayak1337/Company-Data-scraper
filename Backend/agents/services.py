@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import timedelta
 from decimal import Decimal
 
@@ -46,7 +47,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 100,
         "monthly_budget_cents": 0,
         "estimated_cost_per_run_cents": 0,
-        "notes": "Structured direct API runtime. This wave uses local deterministic execution only.",
+        "notes": "Local deterministic review runtime. Hosted model calls are not required for the local V3 loop.",
     },
     {
         "provider": "openrouter",
@@ -60,7 +61,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 25,
         "monthly_budget_cents": 1000,
         "estimated_cost_per_run_cents": 10,
-        "notes": "Hosted model routing placeholder; not executed in this wave.",
+        "notes": "Hosted API provider placeholder. Wire locally with an env var before considering hosted deployment.",
     },
     {
         "provider": "deepseek",
@@ -74,7 +75,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 25,
         "monthly_budget_cents": 1000,
         "estimated_cost_per_run_cents": 10,
-        "notes": "Direct/routed DeepSeek placeholder; not executed in this wave.",
+        "notes": "Hosted API provider placeholder. Wire locally with an env var before considering hosted deployment.",
     },
     {
         "provider": "gemini_cli",
@@ -88,7 +89,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 10,
         "monthly_budget_cents": 0,
         "estimated_cost_per_run_cents": 0,
-        "notes": "Worker-only CLI adapter placeholder; never executed in web requests.",
+        "notes": "Local-only CLI provider. Requires local terminal login and JOB_SCOUT_ENABLE_LOCAL_CLI=true.",
     },
     {
         "provider": "claude_code_cli",
@@ -102,7 +103,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 10,
         "monthly_budget_cents": 0,
         "estimated_cost_per_run_cents": 0,
-        "notes": "Worker-only CLI adapter placeholder; never executed in web requests.",
+        "notes": "Local-only CLI provider. Requires local terminal login and JOB_SCOUT_ENABLE_LOCAL_CLI=true.",
     },
     {
         "provider": "opencode",
@@ -116,7 +117,7 @@ PROVIDER_DEFAULTS = [
         "daily_run_limit": 10,
         "monthly_budget_cents": 0,
         "estimated_cost_per_run_cents": 0,
-        "notes": "Worker-only provider-router placeholder; never executed in web requests.",
+        "notes": "Local-only CLI provider. Requires local terminal login and JOB_SCOUT_ENABLE_LOCAL_CLI=true.",
     },
 ]
 
@@ -129,6 +130,70 @@ AGENT_PROMPT_VERSIONS = {
 }
 
 BLOCKED_POLICY_LEVELS = {"external_action"}
+LOCAL_CLI_COMMANDS = {
+    "gemini_cli": "gemini",
+    "claude_code_cli": "claude",
+    "opencode": "opencode",
+}
+HOSTED_API_PROVIDERS = {"openrouter", "deepseek"}
+
+
+def runtime_environment() -> str:
+    value = str(getattr(settings, "JOB_SCOUT_RUNTIME_ENV", "local") or "local").strip().lower()
+    if value in {"hosted", "production", "prod", "render"}:
+        return "hosted"
+    return "local"
+
+
+def local_cli_enabled() -> bool:
+    return runtime_environment() == "local" and bool(getattr(settings, "JOB_SCOUT_ENABLE_LOCAL_CLI", False))
+
+
+def provider_runtime_status(provider_setting: AgentProviderSetting) -> dict:
+    is_local_cli = provider_setting.worker_only or provider_setting.provider in LOCAL_CLI_COMMANDS
+    command = LOCAL_CLI_COMMANDS.get(provider_setting.provider, "")
+    command_path = shutil.which(command) if command else ""
+    api_key_configured = bool(provider_setting.api_key_env_var and os.environ.get(provider_setting.api_key_env_var))
+    can_run_here = True
+    configuration_status = "ready" if provider_setting.enabled else "disabled"
+    setup_hint = ""
+
+    if is_local_cli:
+        can_run_here = runtime_environment() == "local" and local_cli_enabled() and bool(command_path)
+        if runtime_environment() != "local":
+            configuration_status = "hosted_disabled"
+            setup_hint = "CLI providers only run from a locally logged-in terminal."
+        elif not local_cli_enabled():
+            configuration_status = "local_cli_locked"
+            setup_hint = "Start the backend or worker with JOB_SCOUT_ENABLE_LOCAL_CLI=true before enabling CLI providers."
+        elif not command_path:
+            configuration_status = "cli_missing"
+            setup_hint = f"Install and log in to the `{command}` CLI in this local shell."
+        elif not provider_setting.enabled:
+            configuration_status = "disabled"
+            setup_hint = "Enable this provider only after the local CLI login works."
+        else:
+            configuration_status = "ready"
+            setup_hint = "Local CLI command is available in this shell."
+    elif provider_setting.provider in HOSTED_API_PROVIDERS and provider_setting.enabled and not api_key_configured:
+        can_run_here = False
+        configuration_status = "missing_key"
+        setup_hint = f"Set {provider_setting.api_key_env_var} in the local environment before using this provider."
+    elif not provider_setting.enabled:
+        configuration_status = "disabled"
+
+    return {
+        "runtime_environment": runtime_environment(),
+        "runtime_scope": "local_cli" if is_local_cli else "api",
+        "is_local_only": is_local_cli,
+        "can_run_here": can_run_here,
+        "local_cli_enabled": local_cli_enabled(),
+        "local_cli_command": command,
+        "local_cli_command_found": bool(command_path),
+        "api_key_configured": api_key_configured,
+        "configuration_status": configuration_status,
+        "setup_hint": setup_hint,
+    }
 
 
 def ensure_provider_settings() -> list[AgentProviderSetting]:
@@ -160,6 +225,7 @@ def update_provider_setting(provider_setting: AgentProviderSetting, updates: dic
     for field in (
         "enabled",
         "model_name",
+        "api_key_env_var",
         "default_tool_policy",
         "consent_required",
         "daily_run_limit",
@@ -176,6 +242,20 @@ def update_provider_setting(provider_setting: AgentProviderSetting, updates: dic
             value = nonnegative_int(value, field)
         else:
             value = str(value or "").strip()
+        if field == "enabled" and value and provider_setting.worker_only:
+            command = LOCAL_CLI_COMMANDS.get(provider_setting.provider, provider_setting.provider)
+            if runtime_environment() != "local":
+                raise ValueError("CLI providers are local-only and cannot be enabled in hosted runtime.")
+            if not local_cli_enabled():
+                raise ValueError("Set JOB_SCOUT_ENABLE_LOCAL_CLI=true in the local shell before enabling CLI providers.")
+            if command and not shutil.which(command):
+                raise ValueError(f"Install and log in to the `{command}` CLI before enabling {provider_setting.label}.")
+        if field == "enabled" and value and provider_setting.provider in HOSTED_API_PROVIDERS:
+            env_var = provider_setting.api_key_env_var
+            if env_var and not os.environ.get(env_var):
+                raise ValueError(f"Set {env_var} in the local environment before enabling {provider_setting.label}.")
+        if field == "api_key_env_var" and provider_setting.worker_only:
+            value = ""
         if field == "default_tool_policy" and value not in {choice[0] for choice in AgentProviderSetting.TOOL_POLICY_CHOICES}:
             raise ValueError("Invalid default_tool_policy")
         if getattr(provider_setting, field) != value:
@@ -366,7 +446,13 @@ def adapter_for_run(run: AgentRun):
         add_step(run, "Provider disabled", "failed", "This runtime provider is disabled in settings.")
         return DisabledRuntimeAdapter()
     if provider_setting.worker_only:
-        add_step(run, "Worker-only guard", "failed", "CLI runtimes are disabled until worker execution is implemented.")
+        metadata = provider_runtime_status(provider_setting)
+        add_step(
+            run,
+            "Local CLI guard",
+            "failed",
+            metadata["setup_hint"] or "CLI providers only run from a locally logged-in terminal worker.",
+        )
         return DisabledRuntimeAdapter()
     if run.provider == "direct_api":
         adapters = {
@@ -387,7 +473,9 @@ def adapter_for_run(run: AgentRun):
 def agent_runtime_status() -> dict:
     ensure_provider_settings()
     return {
+        "runtime_environment": runtime_environment(),
         "execution_mode": agent_execution_mode(),
+        "local_cli_enabled": local_cli_enabled(),
         "queue_batch_size": getattr(settings, "AGENT_QUEUE_BATCH_SIZE", 5),
         "queued_runs": AgentRun.objects.filter(status="queued").count(),
         "running_runs": AgentRun.objects.filter(status="running").count(),
@@ -406,6 +494,7 @@ def provider_budget_status(provider_setting: AgentProviderSetting) -> dict:
         or Decimal("0")
     )
     monthly_budget = Decimal(provider_setting.monthly_budget_cents) / Decimal("100")
+    runtime_status = provider_runtime_status(provider_setting)
     return {
         "provider": provider_setting.provider,
         "label": provider_setting.label,
@@ -419,12 +508,17 @@ def provider_budget_status(provider_setting: AgentProviderSetting) -> dict:
         "monthly_spend_estimate": float(spent),
         "monthly_budget_estimate": float(monthly_budget),
         "estimated_cost_per_run_cents": provider_setting.estimated_cost_per_run_cents,
+        **runtime_status,
     }
 
 
 def assert_provider_runtime_allowed(provider_setting: AgentProviderSetting, user_consent: bool) -> None:
     if provider_setting.consent_required and not user_consent:
         raise ValueError("User consent is required before starting this runtime.")
+
+    runtime_status = provider_runtime_status(provider_setting)
+    if provider_setting.worker_only and not runtime_status["can_run_here"]:
+        raise ValueError(runtime_status["setup_hint"] or f"{provider_setting.label} is local-only and unavailable here.")
 
     status = provider_budget_status(provider_setting)
     if provider_setting.daily_run_limit and status["daily_runs_remaining"] <= 0:
@@ -449,6 +543,9 @@ def build_input_snapshot(agent_type: str, provider_setting: AgentProviderSetting
         "provider_enabled": provider_setting.enabled,
         "worker_only": provider_setting.worker_only,
         "api_key_configured": bool(provider_setting.api_key_env_var and os.environ.get(provider_setting.api_key_env_var)),
+        "runtime_environment": runtime_environment(),
+        "runtime_scope": provider_runtime_status(provider_setting)["runtime_scope"],
+        "local_cli_enabled": local_cli_enabled(),
     }
     if agent_type == "profile_builder":
         profile = CandidateProfile.objects.prefetch_related("target_titles", "claims").order_by("id").first()

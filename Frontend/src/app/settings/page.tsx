@@ -1,4 +1,5 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
+import { Cpu, Save, Terminal, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input, Select } from "@/components/ui/form-controls";
@@ -106,38 +107,214 @@ function AiSettings({
   providers: AgentProvider[];
   runtime: AgentRuntimeStatus | null;
 }) {
+  const apiProviders = providers.filter((provider) => !provider.is_local_only);
+  const cliProviders = providers.filter((provider) => provider.is_local_only);
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <PageSection title="Providers" description="Direct API is enabled by default for local deterministic agent reviews. Add env vars before enabling hosted providers.">
-        <div className="divide-y divide-[var(--border)]">
-          {providers.map((provider) => (
-            <form key={provider.provider} action={updateAgentProviderAction} className="grid gap-3 p-4 lg:grid-cols-[180px_minmax(0,1fr)_160px_120px_auto] lg:items-end">
-              <input type="hidden" name="provider" value={provider.provider} />
-              <div>
-                <div className="text-sm font-semibold text-[var(--ink)]">{provider.label}</div>
-                <div className="mt-1 font-mono text-[11px] text-[var(--faint)]">{provider.provider}</div>
-              </div>
-              <TextInput label="Model" name="model_name" defaultValue={provider.model_name} />
-              <TextInput label="Key env var" name="api_key_env_var" defaultValue={provider.api_key_env_var} />
-              <TextInput label="Daily limit" name="daily_run_limit" type="number" defaultValue={String(provider.daily_run_limit)} />
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                  <input name="enabled" type="checkbox" defaultChecked={provider.enabled} />
-                  Enabled
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                  <input name="consent_required" type="checkbox" defaultChecked={provider.consent_required} />
-                  Consent
-                </label>
-                <Button type="submit" variant="primary">Save</Button>
-              </div>
-            </form>
-          ))}
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <PageSection
+        title="Providers"
+        description="Wire providers locally first. API providers use env vars; CLI providers require a logged-in local terminal and never run in hosted web services."
+      >
+        <div className="space-y-4 p-4">
+          <ProviderGroup
+            icon={<Cpu className="h-4 w-4" aria-hidden />}
+            title="API providers"
+            description="Use these from the web app once the local env vars are present."
+            providers={apiProviders}
+          />
+          <ProviderGroup
+            icon={<Terminal className="h-4 w-4" aria-hidden />}
+            title="Local CLI providers"
+            description="These stay worker/local only. Enable after the CLI is installed, logged in, and JOB_SCOUT_ENABLE_LOCAL_CLI=true is set."
+            providers={cliProviders}
+          />
         </div>
       </PageSection>
-      <PageSection title="Runtime">
-        <pre className="overflow-auto p-4 text-xs leading-5 text-[var(--muted)]">{JSON.stringify(runtime, null, 2)}</pre>
-      </PageSection>
+      <RuntimeSettings runtime={runtime} />
+    </div>
+  );
+}
+
+function ProviderGroup({
+  icon,
+  title,
+  description,
+  providers,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  providers: AgentProvider[];
+}) {
+  if (!providers.length) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5 text-[var(--accent)]">{icon}</div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium text-[var(--ink)]">{title}</h3>
+          <p className="mt-0.5 text-xs leading-5 text-[var(--ink-3)]">{description}</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {providers.map((provider) => (
+          <ProviderCard key={provider.provider} provider={provider} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProviderCard({ provider }: { provider: AgentProvider }) {
+  const canToggle = !provider.is_local_only || provider.can_run_here;
+
+  return (
+    <form
+      action={updateAgentProviderAction}
+      className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-4"
+    >
+      <input type="hidden" name="provider" value={provider.provider} />
+      {!canToggle ? <input type="hidden" name="enabled" value="false" /> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-semibold text-[var(--ink)]">{provider.label}</h4>
+            <ProviderStatusBadges provider={provider} />
+          </div>
+          <div className="mt-1 font-mono text-[11px] text-[var(--faint)]">{provider.provider}</div>
+          {provider.setup_hint ? (
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--ink-3)]">{provider.setup_hint}</p>
+          ) : null}
+        </div>
+        <Button type="submit" variant="primary" size="sm" className="self-start">
+          <Save className="h-3.5 w-3.5" aria-hidden />
+          Save
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <TextInput label={provider.is_local_only ? "CLI profile" : "Model"} name="model_name" defaultValue={provider.model_name} />
+        {provider.is_local_only ? (
+          <ProviderReadout icon={<Terminal className="h-3.5 w-3.5" aria-hidden />} label="Command" value={provider.local_cli_command || "not configured"} />
+        ) : (
+          <TextInput label="Key env var" name="api_key_env_var" defaultValue={provider.api_key_env_var} />
+        )}
+        <TextInput label="Daily limit" name="daily_run_limit" type="number" min="0" defaultValue={String(provider.daily_run_limit)} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-4 border-t border-[var(--line)] pt-3">
+        <ToggleField name="enabled" label="Enabled" defaultChecked={provider.enabled} disabled={!canToggle} />
+        <ToggleField name="consent_required" label="Consent required" defaultChecked={provider.consent_required} />
+      </div>
+    </form>
+  );
+}
+
+function ProviderStatusBadges({ provider }: { provider: AgentProvider }) {
+  return (
+    <>
+      <StatusBadge tone={provider.enabled ? "success" : "neutral"} withDot>
+        {provider.enabled ? "Enabled" : "Disabled"}
+      </StatusBadge>
+      <StatusBadge tone={provider.is_local_only ? "warning" : "info"}>
+        {provider.is_local_only ? "Local CLI" : "API"}
+      </StatusBadge>
+      {provider.is_local_only ? (
+        <StatusBadge tone={provider.local_cli_command_found ? "success" : "warning"}>
+          {provider.local_cli_command_found ? "Command found" : "Command missing"}
+        </StatusBadge>
+      ) : provider.configuration_status === "ready" ? (
+        <StatusBadge tone="success">Ready</StatusBadge>
+      ) : provider.api_key_env_var ? (
+        <StatusBadge tone={provider.api_key_configured ? "success" : "warning"}>
+          {provider.api_key_configured ? "Key found" : "Key missing"}
+        </StatusBadge>
+      ) : null}
+    </>
+  );
+}
+
+function ProviderReadout({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <span className="text-xs font-medium text-[var(--muted)]">{label}</span>
+      <div className="mt-1 flex h-8 items-center gap-2 rounded-[3px] border border-[var(--line)] bg-[var(--bg-raised)] px-3 font-mono text-[12px] text-[var(--ink-2)]">
+        <span className="text-[var(--accent)]">{icon}</span>
+        <span className="truncate">{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function RuntimeSettings({ runtime }: { runtime: AgentRuntimeStatus | null }) {
+  const providers = runtime?.providers ?? [];
+  return (
+    <PageSection
+      title="Runtime"
+      description="Current process state. CLI readiness is intentionally tied to this local shell."
+    >
+      <div className="space-y-4 p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <RuntimeStat icon={<Workflow className="h-4 w-4" aria-hidden />} label="Execution" value={runtime?.execution_mode ?? "unknown"} />
+          <RuntimeStat icon={<Terminal className="h-4 w-4" aria-hidden />} label="Environment" value={runtime?.runtime_environment ?? "unknown"} />
+          <RuntimeStat label="Queued" value={String(runtime?.queued_runs ?? 0)} />
+          <RuntimeStat label="Running" value={String(runtime?.running_runs ?? 0)} />
+        </div>
+        <div className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-medium text-[var(--ink)]">Local CLI gate</div>
+              <div className="mt-1 text-xs text-[var(--ink-3)]">Set from JOB_SCOUT_ENABLE_LOCAL_CLI.</div>
+            </div>
+            <StatusBadge tone={runtime?.local_cli_enabled ? "success" : "neutral"} withDot>
+              {runtime?.local_cli_enabled ? "Open" : "Closed"}
+            </StatusBadge>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {providers.map((provider) => {
+            const item = provider as Partial<AgentProvider>;
+            return (
+              <div key={String(item.provider)} className="flex items-center justify-between gap-3 border-t border-[var(--line)] pt-2 text-xs">
+                <span className="truncate text-[var(--ink-2)]">{item.label || item.provider}</span>
+                <span className="font-mono text-[var(--faint)]">{item.configuration_status || "unknown"}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </PageSection>
+  );
+}
+
+function RuntimeStat({
+  icon,
+  label,
+  value,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-3">
+      <div className="flex items-center gap-2 text-xs text-[var(--ink-3)]">
+        {icon ? <span className="text-[var(--accent)]">{icon}</span> : null}
+        {label}
+      </div>
+      <div className="mt-2 truncate font-mono text-sm text-[var(--ink)]">{value}</div>
     </div>
   );
 }
@@ -201,6 +378,18 @@ function TextInput({
     <label>
       <span className="text-xs font-medium text-[var(--muted)]">{label}</span>
       <Input {...props} />
+    </label>
+  );
+}
+
+function ToggleField({
+  label,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  return (
+    <label className="flex min-h-6 items-center gap-2 text-sm text-[var(--muted)]">
+      <input type="checkbox" {...props} />
+      <span>{label}</span>
     </label>
   );
 }

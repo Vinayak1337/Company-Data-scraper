@@ -4,7 +4,7 @@
 
 V3 is an operational console for one job-search loop:
 
-Profile setup -> company watchlist -> source discovery -> periodic crawls -> match review -> email notification -> feedback tuning.
+Profile setup -> company watchlist -> source discovery -> local run-once crawls -> match review -> email notification -> feedback tuning.
 
 The interface should be quiet, dense, and repeatable. This is not a landing page and not a CRM. It should help the user answer:
 
@@ -121,7 +121,7 @@ Purpose: configure AI and notifications.
 
 Sections:
 
-- AI provider readiness.
+- AI provider readiness, split between API providers and local-only CLI providers.
 - Matching preferences.
 - Notification preferences.
 - Email/digest settings.
@@ -134,6 +134,7 @@ Primary actions:
 - Set minimum confidence.
 - Set frequency.
 - Test email configuration.
+- Run the local setup/status CLI.
 
 ## UI Direction
 
@@ -192,6 +193,26 @@ Each crawl run records:
 - Error message.
 
 The crawler should not directly notify the user. It should create/update jobs and then ask matching/notification services what should happen.
+
+For V3, the authoritative recurring workflow is a terminal command:
+
+```bash
+./scripts/job-scout run-once --force
+```
+
+That command is the bridge between local setup and any future hosted scheduler. UptimeRobot, cron, or background workers should call equivalent server behavior only after the local command proves the crawl, match, notification, and email path.
+
+### Local CLI Providers
+
+CLI providers are not hosted providers. They depend on local login state and must be treated as local worker tools.
+
+Rules:
+
+- `gemini_cli`, `claude_code_cli`, and `opencode` are local-only.
+- They require `JOB_SCOUT_ENABLE_LOCAL_CLI=true`.
+- They should never be enabled in `JOB_SCOUT_RUNTIME_ENV=hosted`.
+- The web app can display their readiness, but it should not imply they can run on hosted Render/web services.
+- Setup is done from the terminal with `./scripts/job-scout setup`.
 
 ### Matching
 

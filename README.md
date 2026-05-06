@@ -18,7 +18,8 @@ V3 focuses on one useful loop:
 - `Frontend/`: Next.js console for Today, Companies, Jobs, Profile, and Settings.
 - `docs/v3-plan.md`: detailed implementation plan.
 - `docs/design.md`: V3 product, UX, backend, API, and data design.
-- `render.yaml`, `docker-compose.yml`: deployment/runtime scaffolding.
+- `docker-compose.yml`: local runtime scaffolding.
+- `render.yaml`: optional hosted web scaffolding after local wiring is complete. It does not run local CLI providers or scheduled crawls.
 
 ## Current V3 Surface
 
@@ -38,10 +39,28 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
+../scripts/job-scout setup
 python manage.py runserver
 ```
 
 The backend API defaults to `http://127.0.0.1:8000/api`.
+
+Local setup can also be driven directly from the project root:
+
+```bash
+./scripts/job-scout status
+./scripts/job-scout setup --resume-file resume.md --watchlist-csv companies.csv
+./scripts/job-scout import-watchlist --csv companies.csv
+./scripts/job-scout run-once --force
+```
+
+CLI-based AI providers are local-only because they require terminal login state. Start the backend or worker with an explicit local opt-in before enabling them:
+
+```bash
+JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider gemini_cli --enable-local-cli
+JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider claude_code_cli --enable-local-cli
+JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider opencode --enable-local-cli
+```
 
 Local email defaults to Django's console backend. Configure SMTP for real delivery:
 
@@ -96,12 +115,14 @@ cd Backend
 python manage.py send_match_notifications --limit 25
 ```
 
-Run the full periodic production loop once:
+Run the full local periodic loop once. This crawls due active companies, creates match notification events, and sends queued emails through the configured local email backend:
 
 ```bash
 cd Backend
 python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
 ```
+
+Hosted cron/uptime triggers should wait until the local loop is fully wired and tested. The included Render blueprint is web-only for now.
 
 Example CSV import:
 

@@ -206,3 +206,20 @@ class V3ApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["agent_type"], "source_discovery")
         self.assertIn(response.json()["status"], {"success", "waiting_approval"})
+
+    def test_cli_providers_are_local_only_and_guarded(self):
+        response = self.client.get(reverse("api_agent_providers"))
+
+        self.assertEqual(response.status_code, 200)
+        gemini = next(item for item in response.json()["results"] if item["provider"] == "gemini_cli")
+        self.assertTrue(gemini["is_local_only"])
+        self.assertEqual(gemini["runtime_scope"], "local_cli")
+
+        update_response = self.client.patch(
+            reverse("api_agent_provider_detail", args=["gemini_cli"]),
+            data=json.dumps({"enabled": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(update_response.status_code, 400)
+        self.assertIn("JOB_SCOUT_ENABLE_LOCAL_CLI", update_response.json()["error"])

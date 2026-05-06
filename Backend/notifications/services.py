@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 
+from jobs.models import Job
+from matching.services import refresh_job_matches
 from notifications.models import NotificationEvent, NotificationPreference
 
 
@@ -156,6 +158,38 @@ def send_queued_notification_events(limit: int = 25) -> dict:
         elif before == event.status:
             skipped += 1
     return {"sent": sent, "skipped": skipped, "failed": failed}
+
+
+def create_notification_events_for_jobs(jobs) -> dict:
+    job_list = list(jobs)
+    if not job_list:
+        return {"reviewed": 0, "queued": 0}
+
+    before_ids = set(NotificationEvent.objects.values_list("id", flat=True))
+    matches = refresh_job_matches(job_list)
+    queued = 0
+    for match in matches.values():
+        if not match.should_notify:
+            continue
+        event = create_notification_event(match)
+        if event.id not in before_ids:
+            queued += 1
+    return {"reviewed": len(job_list), "queued": queued}
+
+
+def create_notification_events_for_company(company, limit: int = 100) -> dict:
+    jobs = Job.objects.select_related("company").filter(company=company).order_by("-first_seen_at")[: max(limit, 0)]
+    return create_notification_events_for_jobs(jobs)
+
+
+def create_notification_events_for_scan_jobs(scan_jobs, limit_per_company: int = 100) -> dict:
+    reviewed = 0
+    queued = 0
+    for scan_job in scan_jobs:
+        summary = create_notification_events_for_company(scan_job.company, limit=limit_per_company)
+        reviewed += summary["reviewed"]
+        queued += summary["queued"]
+    return {"reviewed": reviewed, "queued": queued}
 
 
 def send_notification_event(event: NotificationEvent, preference: NotificationPreference | None = None) -> NotificationEvent:

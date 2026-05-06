@@ -143,6 +143,8 @@ JOB_SCOUT_API_TOKEN = os.environ.get("JOB_SCOUT_API_TOKEN", "")
 
 AGENT_EXECUTION_MODE = os.environ.get("AGENT_EXECUTION_MODE", "inline").strip().lower()
 AGENT_QUEUE_BATCH_SIZE = int(os.environ.get("AGENT_QUEUE_BATCH_SIZE", "5"))
+JOB_SCOUT_RUNTIME_ENV = os.environ.get("JOB_SCOUT_RUNTIME_ENV", "local").strip().lower()
+JOB_SCOUT_ENABLE_LOCAL_CLI = os.environ.get("JOB_SCOUT_ENABLE_LOCAL_CLI", "False").lower() in {"1", "true", "yes"}
 
 LANGSMITH_TRACING = os.environ.get("LANGSMITH_TRACING", "False").lower() in {"1", "true", "yes"}
 LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "job-scout-v3").strip()

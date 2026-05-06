@@ -1,5 +1,4 @@
 import json
-import os
 
 from django.conf import settings
 from django.db import connection
@@ -13,6 +12,7 @@ from agents.services import (
     agent_runtime_status,
     cancel_agent_run,
     ensure_provider_settings,
+    provider_runtime_status,
     retry_agent_run,
     set_agent_decision_status,
     start_agent_run,
@@ -37,6 +37,7 @@ from matching.models import JobMatch, MatchFeedback
 from matching.services import record_match_feedback, refresh_job_match, refresh_job_matches, serialize_job_match
 from notifications.services import (
     create_notification_event,
+    create_notification_events_for_company,
     get_notification_preferences,
     notification_preferences_status,
     serialize_notification_preferences,
@@ -630,11 +631,7 @@ def refresh_current_matches_count() -> int:
 
 
 def refresh_new_job_matches(company: Company) -> None:
-    jobs = list(Job.objects.select_related("company").filter(company=company).order_by("-first_seen_at")[:100])
-    matches = refresh_job_matches(jobs)
-    for match in matches.values():
-        if match.should_notify:
-            create_notification_event(match)
+    create_notification_events_for_company(company)
 
 
 def scrape_response(company: Company, log, crawl_run: ScanJob | None = None) -> JsonResponse:
@@ -883,6 +880,7 @@ def serialize_search_strategy(strategy: SearchStrategy) -> dict:
 
 
 def serialize_agent_provider(provider: AgentProviderSetting) -> dict:
+    runtime_status = provider_runtime_status(provider)
     return {
         "id": provider.id,
         "provider": provider.provider,
@@ -891,13 +889,14 @@ def serialize_agent_provider(provider: AgentProviderSetting) -> dict:
         "enabled": provider.enabled,
         "worker_only": provider.worker_only,
         "api_key_env_var": provider.api_key_env_var,
-        "api_key_configured": bool(provider.api_key_env_var and os.environ.get(provider.api_key_env_var)),
+        "api_key_configured": runtime_status["api_key_configured"],
         "default_tool_policy": provider.default_tool_policy,
         "consent_required": provider.consent_required,
         "daily_run_limit": provider.daily_run_limit,
         "monthly_budget_cents": provider.monthly_budget_cents,
         "estimated_cost_per_run_cents": provider.estimated_cost_per_run_cents,
         "notes": provider.notes,
+        **runtime_status,
     }
 
 

@@ -356,6 +356,15 @@ export type AgentProvider = {
   worker_only: boolean;
   api_key_env_var: string;
   api_key_configured: boolean;
+  runtime_environment: string;
+  runtime_scope: "api" | "local_cli" | string;
+  is_local_only: boolean;
+  can_run_here: boolean;
+  local_cli_enabled: boolean;
+  local_cli_command: string;
+  local_cli_command_found: boolean;
+  configuration_status: string;
+  setup_hint: string;
   default_tool_policy: string;
   consent_required: boolean;
   daily_run_limit: number;
@@ -365,7 +374,9 @@ export type AgentProvider = {
 };
 
 export type AgentRuntimeStatus = {
+  runtime_environment: string;
   execution_mode: string;
+  local_cli_enabled: boolean;
   queue_batch_size: number;
   queued_runs: number;
   running_runs: number;

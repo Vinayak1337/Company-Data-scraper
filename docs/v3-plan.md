@@ -9,7 +9,7 @@ The product should feel smaller than V2. Every screen and backend module should 
 1. The user finishes profile, AI, and notification setup.
 2. The user imports companies from CSV and controls which companies are active.
 3. The system finds and verifies each company's public jobs source.
-4. The system periodically crawls active sources and normalizes jobs.
+4. A local terminal command crawls due active sources and normalizes jobs. Hosted scheduling comes after the local loop is proven.
 5. The system uses deterministic scoring plus agentic AI review to decide match quality.
 6. The system notifies the user with useful match explanations.
 7. The user gives feedback so future notifications become stricter or looser.
@@ -24,10 +24,10 @@ Required setup:
 
 - Profile identity: name, headline, location.
 - Profile substance: resume text, skills, target titles, seniority, preferred work modes, target locations, dealbreakers.
-- AI runtime: provider, model, key/env readiness, run limits, consent requirement.
+- AI runtime: provider, model, key/env readiness, run limits, consent requirement, and whether the provider is local-only.
 - Notification settings: email address, digest frequency, minimum match score, confidence threshold, quiet hours.
 
-The app can show data before setup is complete, but scheduled matching and notifications should remain disabled until the required setup gates pass.
+The app can show data before setup is complete, but recurring matching and notifications should remain disabled until the required setup gates pass. V3 starts local-first: `./scripts/job-scout setup` collects setup data, imports watchlists, and reports provider readiness before the app is treated as production-ready.
 
 ### 2. Company Watchlist Import
 
@@ -63,17 +63,27 @@ For each company without a usable jobs source:
 
 This can start as a local deterministic agent adapter and later call an LLM/search runtime. The database should already represent agent decisions, confidence, and auditability.
 
-### 4. Periodic Crawling
+### 4. Local Periodic Crawling
 
-A scheduled event runs due active companies:
+A terminal command runs due active companies:
 
-- Select companies with at least one active source and `next_crawl_at <= now`.
+- Select companies with at least one active source whose scan cadence is due.
 - Crawl the primary source.
 - Normalize jobs into a stable `Job` record.
 - Deduplicate by company plus apply URL, external ID, or normalized title/location/source.
 - Update `last_seen_at` for still-open jobs.
 - Mark missing jobs as stale/closed after repeated absence.
 - Record each crawl run with counts, status, error, and duration.
+- Create match notification events after crawls before sending queued emails.
+
+The command path is local-first:
+
+```bash
+./scripts/job-scout run-once --force
+python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
+```
+
+Hosted cron, uptime pings, or worker deployment should be added only after this local command produces correct crawl, match, and email behavior.
 
 ### 5. Matching
 
@@ -150,6 +160,7 @@ Keep:
 - `agents`: provider settings, run audit, source discovery and match review adapters.
 - `api`: small JSON API for the V3 frontend.
 - `scrapers_engine`: source-specific and generic job extraction.
+- `api.management.commands.job_scout`: local setup/status/run-once CLI.
 
 Remove from V3:
 
@@ -248,6 +259,7 @@ Compatibility note:
 - Frontend lint/build.
 - API smoke tests.
 - Minimal local run instructions.
+- Local setup CLI checks for profile, watchlist, notifications, providers, and CLI-only runtime guards.
 
 ## Non-Goals
 
@@ -257,6 +269,7 @@ Do not add these in V3:
 - Resume tailoring.
 - Cover letter generation.
 - Interview prep.
+- Hosted CLI execution. CLI providers require a locally logged-in terminal and must stay out of hosted web/runtime services.
 - Offer support.
 - Recruiter/contact research.
 - Large analytics dashboards.

@@ -12,12 +12,12 @@ export async function updateNotificationPreferencesAction(formData: FormData) {
   try {
     await updateNotificationPreferences({
       email_address: getFormValue(formData, "email_address"),
-      immediate_email_enabled: formData.get("immediate_email_enabled") === "on",
-      quiet_hours_enabled: formData.get("quiet_hours_enabled") === "on",
+      immediate_email_enabled: getFormBool(formData, "immediate_email_enabled"),
+      quiet_hours_enabled: getFormBool(formData, "quiet_hours_enabled"),
       quiet_hours_start: getFormValue(formData, "quiet_hours_start") || "22:00",
       quiet_hours_end: getFormValue(formData, "quiet_hours_end") || "08:00",
       timezone: getFormValue(formData, "timezone") || "UTC",
-      digest_enabled: formData.get("digest_enabled") === "on",
+      digest_enabled: getFormBool(formData, "digest_enabled"),
       digest_frequency: getFormValue(formData, "digest_frequency") || "daily",
       digest_time: getFormValue(formData, "digest_time") || "09:00",
       digest_channel: getFormValue(formData, "digest_channel") || "email",
@@ -42,11 +42,11 @@ export async function updateAgentProviderAction(formData: FormData) {
 
   try {
     await updateAgentProvider(provider, {
-      enabled: formData.get("enabled") === "on",
+      enabled: getFormBool(formData, "enabled"),
       model_name: getFormValue(formData, "model_name"),
       api_key_env_var: getFormValue(formData, "api_key_env_var"),
       daily_run_limit: Number(getFormValue(formData, "daily_run_limit") || "25"),
-      consent_required: formData.get("consent_required") === "on",
+      consent_required: getFormBool(formData, "consent_required"),
     });
     revalidatePath("/settings");
     revalidatePath("/");
@@ -60,6 +60,11 @@ export async function updateAgentProviderAction(formData: FormData) {
 function getFormValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getFormBool(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" && ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 function redirectWithSettingsError(message: string): never {
