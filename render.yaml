@@ -19,6 +19,16 @@ services:
         value: .onrender.com
       - key: CSRF_TRUSTED_ORIGINS
         value: https://*.onrender.com
+      - key: SECURE_SSL_REDIRECT
+        value: true
+      - key: SECURE_PROXY_SSL_HEADER
+        value: true
+      - key: SECURE_HSTS_SECONDS
+        value: 3600
+      - key: SESSION_COOKIE_SECURE
+        value: true
+      - key: CSRF_COOKIE_SECURE
+        value: true
       - key: TIME_ZONE
         value: UTC
       - key: SCRAPER_TIMEOUT_SECONDS
@@ -51,6 +61,48 @@ services:
         sync: false
       - key: LANGSMITH_PROJECT
         value: job-scout-v3
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: true
+
+  - type: cron
+    name: job-scout-periodic
+    runtime: python
+    rootDir: Backend
+    plan: starter
+    buildCommand: ./build.sh
+    startCommand: python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
+    schedule: "0 * * * *"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      - key: TIME_ZONE
+        value: UTC
+      - key: DATABASE_URL
+        fromDatabase:
+          name: job-scout-db
+          property: connectionString
+      - key: DATABASE_SSLMODE
+        value: require
+      - key: SCRAPER_TIMEOUT_SECONDS
+        value: 20
       - key: EMAIL_BACKEND
         value: django.core.mail.backends.smtp.EmailBackend
       - key: DEFAULT_FROM_EMAIL

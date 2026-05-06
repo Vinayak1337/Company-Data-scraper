@@ -96,6 +96,13 @@ cd Backend
 python manage.py send_match_notifications --limit 25
 ```
 
+Run the full periodic production loop once:
+
+```bash
+cd Backend
+python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
+```
+
 Example CSV import:
 
 ```bash

@@ -25,6 +25,11 @@ services:
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+      SECURE_PROXY_SSL_HEADER: ${SECURE_PROXY_SSL_HEADER:-False}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-False}
+      CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-False}
       TIME_ZONE: ${TIME_ZONE:-UTC}
       DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
       DATABASE_SSLMODE: disable
@@ -33,7 +38,6 @@ services:
       AGENT_EXECUTION_MODE: ${AGENT_EXECUTION_MODE:-queued}
       AGENT_QUEUE_BATCH_SIZE: ${AGENT_QUEUE_BATCH_SIZE:-5}
       SCRAPER_TIMEOUT_SECONDS: ${SCRAPER_TIMEOUT_SECONDS:-20}
-      SCANNER_ENABLED: ${SCANNER_ENABLED:-True}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
@@ -67,12 +71,17 @@ services:
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    command: sh -c "while true; do python manage.py scan_due_companies --limit $${SCAN_BATCH_LIMIT:-25}; python manage.py send_match_notifications --limit $${NOTIFICATION_BATCH_LIMIT:-25}; sleep $${SCAN_INTERVAL_SECONDS:-3600}; done"
+    command: sh -c "while true; do python manage.py run_periodic_maintenance --scan-limit $${SCAN_BATCH_LIMIT:-25} --notification-limit $${NOTIFICATION_BATCH_LIMIT:-25}; sleep $${SCAN_INTERVAL_SECONDS:-3600}; done"
     environment:
       SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+      SECURE_PROXY_SSL_HEADER: ${SECURE_PROXY_SSL_HEADER:-False}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-False}
+      CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-False}
       TIME_ZONE: ${TIME_ZONE:-UTC}
       DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
       DATABASE_SSLMODE: disable
@@ -104,6 +113,11 @@ services:
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+      SECURE_PROXY_SSL_HEADER: ${SECURE_PROXY_SSL_HEADER:-False}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-False}
+      CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-False}
       TIME_ZONE: ${TIME_ZONE:-UTC}
       DATABASE_URL: postgresql://${POSTGRES_USER:-job_scout}:${POSTGRES_PASSWORD:-job_scout}@db:5432/${POSTGRES_DB:-job_scout}
       DATABASE_SSLMODE: disable

@@ -19,6 +19,18 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in {"1", "true", "yes"}
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if os.environ.get("SECURE_PROXY_SSL_HEADER", "False").lower() in {"1", "true", "yes"}
+    else None
+)
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get("SECURE_HSTS_INCLUDE_SUBDOMAINS", "False").lower() in {"1", "true", "yes"}
+SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "False").lower() in {"1", "true", "yes"}
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in {"1", "true", "yes"}
+CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() in {"1", "true", "yes"}
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -125,7 +137,6 @@ SCRAPER_USER_AGENT = os.environ.get(
     "CompanyJobScraper/1.0 (+https://github.com/self-hosted-job-scraper)",
 )
 SCRAPER_TIMEOUT_SECONDS = int(os.environ.get("SCRAPER_TIMEOUT_SECONDS", "20"))
-SCANNER_ENABLED = os.environ.get("SCANNER_ENABLED", "False").lower() in {"1", "true", "yes"}
 
 JOB_SCOUT_REQUIRE_AUTH = os.environ.get("JOB_SCOUT_REQUIRE_AUTH", "False").lower() in {"1", "true", "yes"}
 JOB_SCOUT_API_TOKEN = os.environ.get("JOB_SCOUT_API_TOKEN", "")
