@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE_PATH" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" && pwd)"
+  SOURCE_PATH="$(readlink "$SOURCE_PATH")"
+  [[ "$SOURCE_PATH" != /* ]] && SOURCE_PATH="$SOURCE_DIR/$SOURCE_PATH"
+done
+
+ROOT_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/Backend"
 FRONTEND_DIR="$ROOT_DIR/Frontend"
 BACKEND_PY="$BACKEND_DIR/.venv/bin/python"
@@ -14,6 +21,7 @@ usage() {
 Job Scout local workspace CLI
 
 Usage:
+  ./jobscout install-command [--target-dir DIR] [--force]
   ./jobscout init [--non-interactive] [--skip-install] [--skip-provider]
   ./jobscout providers [provider options]
   ./jobscout status
@@ -75,6 +83,109 @@ backend_manage() {
 
 job_scout_backend_cli() {
   "$ROOT_DIR/scripts/job-scout" "$@"
+}
+
+path_contains_dir() {
+  case ":$PATH:" in
+    *":$1:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+default_install_dir() {
+  if path_contains_dir "$HOME/.local/bin"; then
+    printf "%s\n" "$HOME/.local/bin"
+  elif [[ -d "/usr/local/bin" && -w "/usr/local/bin" && ":$PATH:" == *":/usr/local/bin:"* ]]; then
+    printf "%s\n" "/usr/local/bin"
+  elif [[ -d "/opt/homebrew/bin" && -w "/opt/homebrew/bin" && ":$PATH:" == *":/opt/homebrew/bin:"* ]]; then
+    printf "%s\n" "/opt/homebrew/bin"
+  else
+    printf "%s\n" "$HOME/.local/bin"
+  fi
+}
+
+install_shell_command() {
+  local target_dir=""
+  local force=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --target-dir)
+        target_dir="${2:?--target-dir requires a value}"
+        shift 2
+        ;;
+      --force)
+        force=1
+        shift
+        ;;
+      -h|--help)
+        cat <<'EOF'
+Install the jobscout command into a shell PATH directory.
+
+Usage:
+  ./jobscout install-command [--target-dir DIR] [--force]
+
+This creates one symlink named jobscout. It does not edit shell profiles,
+virtualenv activation files, keybindings, or terminal settings.
+EOF
+        return 0
+        ;;
+      *)
+        echo "Unknown install-command option: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+
+  [[ -n "$target_dir" ]] || target_dir="$(default_install_dir)"
+  mkdir -p "$target_dir"
+
+  local target="$target_dir/jobscout"
+  if [[ -e "$target" || -L "$target" ]]; then
+    local current_target=""
+    current_target="$(readlink "$target" 2>/dev/null || true)"
+    if [[ "$current_target" != "$ROOT_DIR/jobscout" && "$force" -ne 1 ]]; then
+      cat >&2 <<EOF
+Refusing to overwrite existing command:
+  $target
+
+Run with --force only if you want this repo to replace it:
+  ./jobscout install-command --force
+EOF
+      return 1
+    fi
+  fi
+
+  chmod +x "$ROOT_DIR/jobscout"
+  ln -sfn "$ROOT_DIR/jobscout" "$target"
+
+  cat <<EOF
+Installed:
+  $target -> $ROOT_DIR/jobscout
+
+This installer changed only that symlink.
+EOF
+
+  if path_contains_dir "$target_dir"; then
+    cat <<'EOF'
+
+You can now run:
+  jobscout init
+
+If this same shell previously said command not found, run:
+  rehash
+EOF
+  else
+    cat <<EOF
+
+Your shell PATH does not include $target_dir yet.
+For this terminal, run:
+  export PATH="$target_dir:\$PATH"
+
+Then run:
+  jobscout init
+EOF
+  fi
 }
 
 write_setup_marker() {
@@ -245,6 +356,9 @@ if [[ $# -gt 0 ]]; then
 fi
 
 case "$command" in
+  install-command)
+    install_shell_command "$@"
+    ;;
   init)
     init_workspace "$@"
     ;;
