@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOURCE_PATH="${BASH_SOURCE[0]}"
-while [[ -L "$SOURCE_PATH" ]]; do
-  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" && pwd)"
-  SOURCE_PATH="$(readlink "$SOURCE_PATH")"
-  [[ "$SOURCE_PATH" != /* ]] && SOURCE_PATH="$SOURCE_DIR/$SOURCE_PATH"
-done
-
-ROOT_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/Backend"
 FRONTEND_DIR="$ROOT_DIR/Frontend"
 BACKEND_PY="$BACKEND_DIR/.venv/bin/python"
@@ -21,7 +14,6 @@ usage() {
 Job Scout local workspace CLI
 
 Usage:
-  ./jobscout install-command
   ./jobscout init [--non-interactive] [--skip-install] [--skip-provider]
   ./jobscout providers [provider options]
   ./jobscout status
@@ -34,7 +26,6 @@ Usage:
 
 Root command for managing both Backend and Frontend locally.
 Provider setup is terminal-only and is delegated to Django after init.
-Run ./jobscout install-command once if you want to use jobscout without ./.
 EOF
 }
 
@@ -84,35 +75,6 @@ backend_manage() {
 
 job_scout_backend_cli() {
   "$ROOT_DIR/scripts/job-scout" "$@"
-}
-
-install_shell_command() {
-  local target_dir=""
-
-  if [[ -n "${VIRTUAL_ENV:-}" && -d "$VIRTUAL_ENV/bin" ]]; then
-    target_dir="$VIRTUAL_ENV/bin"
-  elif [[ -d "$ROOT_DIR/.venv/bin" ]]; then
-    target_dir="$ROOT_DIR/.venv/bin"
-  elif [[ -d "$BACKEND_DIR/.venv/bin" ]]; then
-    target_dir="$BACKEND_DIR/.venv/bin"
-  else
-    target_dir="$HOME/.local/bin"
-    mkdir -p "$target_dir"
-  fi
-
-  chmod +x "$ROOT_DIR/jobscout"
-  ln -sf "$ROOT_DIR/jobscout" "$target_dir/jobscout"
-
-  cat <<EOF
-Installed jobscout at:
-  $target_dir/jobscout
-
-You can now run:
-  jobscout init
-
-If your shell still says command not found, activate the venv or add this directory to PATH:
-  export PATH="$target_dir:\$PATH"
-EOF
 }
 
 write_setup_marker() {
@@ -283,9 +245,6 @@ if [[ $# -gt 0 ]]; then
 fi
 
 case "$command" in
-  install-command)
-    install_shell_command "$@"
-    ;;
   init)
     init_workspace "$@"
     ;;
