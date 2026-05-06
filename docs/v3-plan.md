@@ -27,7 +27,7 @@ Required setup:
 - AI runtime: provider, model, key/env readiness, run limits, consent requirement, and whether the provider is local-only. Provider setup belongs to the terminal CLI, not Settings.
 - Notification settings: email address, digest frequency, minimum match score, confidence threshold, quiet hours.
 
-The app can show data before setup is complete, but recurring matching and notifications should remain disabled until the required setup gates pass. V3 starts local-first: `./jobscout setup` collects setup data, `./jobscout providers` chooses the local brain provider and writes `Backend/.env`, and the web UI only reports provider readiness before the app is treated as production-ready.
+The app should only boot after local workspace initialization is complete. V3 starts local-first: `./jobscout init` creates env files, runs migrations, and writes `.jobscout/setup.json`; `./jobscout setup` collects setup data; `./jobscout providers` chooses the local brain provider and writes `Backend/.env`. The web UI reports product readiness after boot, while backend/frontend runtime starts crash early if the local init marker is missing.
 
 ### 2. Company Watchlist Import
 
@@ -84,6 +84,12 @@ python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 2
 ```
 
 Hosted cron, uptime pings, or worker deployment should be added only after this local command produces correct crawl, match, and email behavior.
+
+Runtime guard:
+
+- `./jobscout backend`, `./jobscout frontend`, and `./jobscout dev` refuse to run until `./jobscout init` has completed.
+- Direct Django runtime commands such as `runserver` and local worker commands also refuse to run without `.jobscout/setup.json`.
+- Direct Next.js `dev` and `start` refuse to run without `.jobscout/setup.json`; lint/build/test commands remain available.
 
 ### 5. Matching
 

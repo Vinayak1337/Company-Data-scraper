@@ -40,6 +40,7 @@ V3 focuses on one useful loop:
 
 The root `jobscout` command manages both `Backend/` and `Frontend/`.
 Use `./jobscout ...` from the repo root, or `jobscout ...` if the repo root is on your `PATH`.
+`./jobscout init` writes the local setup marker at `.jobscout/setup.json`. Backend and frontend runtime commands intentionally exit before boot if that marker is missing.
 
 ```bash
 ./jobscout status
@@ -74,6 +75,12 @@ DEFAULT_FROM_EMAIL="Job Scout <jobs@example.com>"
 ```
 
 ## Manual Frontend Local Setup
+
+Manual frontend starts still require the root init step first:
+
+```bash
+./jobscout init
+```
 
 ```bash
 cd Frontend
@@ -110,15 +117,13 @@ BACKEND_API_BASE_URL=http://127.0.0.1:8000/api npm run dev
 Send queued notification emails:
 
 ```bash
-cd Backend
-python manage.py send_match_notifications --limit 25
+./jobscout run-once --force
 ```
 
 Run the full local periodic loop once. This crawls due active companies, creates match notification events, and sends queued emails through the configured local email backend:
 
 ```bash
-cd Backend
-python manage.py run_periodic_maintenance --scan-limit 25 --notification-limit 25
+./jobscout run-once --force
 ```
 
 Hosted cron/uptime triggers should wait until the local loop is fully wired and tested. The included Render blueprint is web-only for now.

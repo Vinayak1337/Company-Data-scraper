@@ -214,6 +214,7 @@ Rules:
 - They should never be enabled in `JOB_SCOUT_RUNTIME_ENV=hosted`.
 - The web app can display their readiness, but it should not imply they can run on hosted Render/web services.
 - Setup is done from the terminal with `./jobscout setup`.
+- Backend and frontend runtime starts require the local `.jobscout/setup.json` marker written by `./jobscout init`.
 
 ### Matching
 

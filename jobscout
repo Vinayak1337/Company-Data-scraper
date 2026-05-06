@@ -6,6 +6,8 @@ BACKEND_DIR="$ROOT_DIR/Backend"
 FRONTEND_DIR="$ROOT_DIR/Frontend"
 BACKEND_PY="$BACKEND_DIR/.venv/bin/python"
 BACKEND_API_BASE_URL="${BACKEND_API_BASE_URL:-http://127.0.0.1:8000/api}"
+SETUP_DIR="$ROOT_DIR/.jobscout"
+SETUP_MARKER="$SETUP_DIR/setup.json"
 
 usage() {
   cat <<'EOF'
@@ -75,6 +77,38 @@ job_scout_backend_cli() {
   "$ROOT_DIR/scripts/job-scout" "$@"
 }
 
+write_setup_marker() {
+  mkdir -p "$SETUP_DIR"
+  local initialized_at
+  initialized_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  cat > "$SETUP_MARKER" <<EOF
+{
+  "initialized_at": "$initialized_at",
+  "backend_env": "Backend/.env",
+  "frontend_env": "Frontend/.env.local",
+  "command": "./jobscout init"
+}
+EOF
+}
+
+require_setup() {
+  if [[ "${JOBSCOUT_ALLOW_UNINITIALIZED:-}" == "true" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$SETUP_MARKER" ]]; then
+    cat >&2 <<EOF
+Job Scout setup is not complete.
+
+Run this from the repository root before starting the backend or frontend:
+  ./jobscout init
+
+For CI-only runtime smoke tests, set JOBSCOUT_ALLOW_UNINITIALIZED=true.
+EOF
+    exit 78
+  fi
+}
+
 init_workspace() {
   local skip_install=0
   local skip_provider=0
@@ -125,6 +159,7 @@ init_workspace() {
   fi
 
   job_scout_backend_cli status
+  write_setup_marker
 
   cat <<EOF
 
@@ -140,6 +175,7 @@ EOF
 }
 
 run_backend_server() {
+  require_setup
   local host="127.0.0.1"
   local port="8000"
   while [[ $# -gt 0 ]]; do
@@ -162,6 +198,7 @@ run_backend_server() {
 }
 
 run_frontend_server() {
+  require_setup
   local host="127.0.0.1"
   local port="3000"
   while [[ $# -gt 0 ]]; do
@@ -185,6 +222,7 @@ run_frontend_server() {
 }
 
 run_dev() {
+  require_setup
   ensure_backend_env
   ensure_frontend_env
   ensure_backend_venv
