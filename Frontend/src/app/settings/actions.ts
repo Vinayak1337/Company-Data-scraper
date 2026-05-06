@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   getApiErrorMessage,
-  updateAgentProvider,
   updateNotificationPreferences,
 } from "@/lib/api";
 
@@ -32,29 +31,6 @@ export async function updateNotificationPreferencesAction(formData: FormData) {
   }
 
   redirect("/settings?settings_notice=Notification%20preferences%20updated.");
-}
-
-export async function updateAgentProviderAction(formData: FormData) {
-  const provider = getFormValue(formData, "provider");
-  if (!provider) {
-    redirectWithSettingsError("Provider is required.");
-  }
-
-  try {
-    await updateAgentProvider(provider, {
-      enabled: getFormBool(formData, "enabled"),
-      model_name: getFormValue(formData, "model_name"),
-      api_key_env_var: getFormValue(formData, "api_key_env_var"),
-      daily_run_limit: Number(getFormValue(formData, "daily_run_limit") || "25"),
-      consent_required: getFormBool(formData, "consent_required"),
-    });
-    revalidatePath("/settings");
-    revalidatePath("/");
-  } catch (error) {
-    redirectWithSettingsError(getApiErrorMessage(error));
-  }
-
-  redirect("/settings?settings_notice=AI%20provider%20updated.");
 }
 
 function getFormValue(formData: FormData, key: string) {

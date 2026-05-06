@@ -481,7 +481,7 @@ def agent_runs_list(request: HttpRequest) -> JsonResponse:
         try:
             run = start_agent_run(
                 agent_type=str(payload.get("agent_type") or ""),
-                provider=str(payload.get("provider") or "direct_api"),
+                provider=str(payload.get("provider") or ""),
                 tool_policy=str(payload.get("tool_policy") or "read_only"),
                 user_consent=bool(payload.get("user_consent", False)),
             )

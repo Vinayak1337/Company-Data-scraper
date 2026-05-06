@@ -121,7 +121,7 @@ Purpose: configure AI and notifications.
 
 Sections:
 
-- AI provider readiness, split between API providers and local-only CLI providers.
+- AI provider readiness, split between API providers and local-only CLI providers. Setup is read-only in the web UI.
 - Matching preferences.
 - Notification preferences.
 - Email/digest settings.
@@ -129,7 +129,7 @@ Sections:
 
 Primary actions:
 
-- Enable AI provider.
+- Show the terminal command for provider setup.
 - Set minimum score.
 - Set minimum confidence.
 - Set frequency.
@@ -209,7 +209,8 @@ CLI providers are not hosted providers. They depend on local login state and mus
 Rules:
 
 - `gemini_cli`, `claude_code_cli`, and `opencode` are local-only.
-- They require `JOB_SCOUT_ENABLE_LOCAL_CLI=true`.
+- `codex_cli` is also supported as a local-only brain provider.
+- They are configured through `./scripts/job-scout providers`, which writes `Backend/.env`.
 - They should never be enabled in `JOB_SCOUT_RUNTIME_ENV=hosted`.
 - The web app can display their readiness, but it should not imply they can run on hosted Render/web services.
 - Setup is done from the terminal with `./scripts/job-scout setup`.

@@ -1,11 +1,24 @@
+import os
+import shutil
+from getpass import getpass
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
 from agents.models import AgentProviderSetting
-from agents.services import ensure_provider_settings, local_cli_enabled, provider_runtime_status, runtime_environment, update_provider_setting
+from agents.services import (
+    HOSTED_API_PROVIDERS,
+    PROVIDER_DEFAULTS,
+    ensure_provider_settings,
+    local_cli_enabled,
+    provider_runtime_status,
+    runtime_environment,
+    selected_brain_provider,
+    update_provider_setting,
+)
 from companies.services import import_company_watchlist_csv, run_due_company_scans
 from notifications.services import (
     create_notification_events_for_scan_jobs,
@@ -14,6 +27,74 @@ from notifications.services import (
     update_notification_preferences,
 )
 from profiles.services import generate_search_strategy, get_profile, import_resume, update_profile
+
+
+def provider_names() -> list[str]:
+    return [item["provider"] for item in PROVIDER_DEFAULTS]
+
+
+PROVIDER_ALIASES = {
+    "gemini": "gemini_cli",
+    "claude": "claude_code_cli",
+    "claude_cli": "claude_code_cli",
+    "codex": "codex_cli",
+}
+
+
+def provider_choices() -> list[str]:
+    return [*provider_names(), *PROVIDER_ALIASES.keys()]
+
+
+def normalize_provider_name(value: str) -> str:
+    provider = str(value or "").strip()
+    return PROVIDER_ALIASES.get(provider, provider)
+
+
+def read_env_values(path: Path) -> tuple[list[str], dict[str, str]]:
+    if not path.exists():
+        return [], {}
+    lines = path.read_text(encoding="utf-8").splitlines()
+    values = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        values[key.strip()] = value.strip()
+    return lines, values
+
+
+def write_env_values(path: Path, updates: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines, _ = read_env_values(path)
+    rendered = []
+    written = set()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            rendered.append(line)
+            continue
+        key, _ = stripped.split("=", 1)
+        key = key.strip()
+        if key in updates:
+            rendered.append(f"{key}={quote_env_value(updates[key])}")
+            written.add(key)
+        else:
+            rendered.append(line)
+    if rendered and rendered[-1].strip():
+        rendered.append("")
+    for key, value in updates.items():
+        if key in written:
+            continue
+        rendered.append(f"{key}={quote_env_value(value)}")
+    path.write_text("\n".join(rendered).rstrip() + "\n", encoding="utf-8")
+
+
+def quote_env_value(value: str) -> str:
+    text = str(value)
+    if not text or any(char.isspace() for char in text) or "#" in text or "{" in text or "}" in text:
+        return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return text
 
 
 class Command(BaseCommand):
@@ -31,16 +112,19 @@ class Command(BaseCommand):
         setup.add_argument("--skip-migrate", action="store_true", help="Do not run database migrations first.")
         setup.add_argument("--non-interactive", action="store_true", help="Only apply provided files/options.")
         setup.add_argument(
-            "--enable-local-cli",
-            action="store_true",
-            help="Enable selected local CLI providers when JOB_SCOUT_ENABLE_LOCAL_CLI=true and the command is installed.",
-        )
-        setup.add_argument(
             "--provider",
             action="append",
-            choices=["gemini_cli", "claude_code_cli", "opencode"],
-            help="Local CLI provider to enable during setup. Can be passed multiple times.",
+            choices=provider_choices(),
+            help="Brain provider to configure during setup.",
         )
+        setup.add_argument("--env-file", default=str(settings.BASE_DIR / ".env"), help="Backend .env file to update.")
+
+        providers = subcommands.add_parser("providers", help="Configure the local Job Scout brain provider.")
+        providers.add_argument("--provider", choices=provider_choices(), help="Provider to configure without opening the selector.")
+        providers.add_argument("--env-file", default=str(settings.BASE_DIR / ".env"), help="Backend .env file to update.")
+        providers.add_argument("--api-key", help="API key to write for API providers. Prefer interactive input.")
+        providers.add_argument("--command", help="CLI command template. Use {prompt} where the prompt should be inserted.")
+        providers.add_argument("--non-interactive", action="store_true", help="Fail instead of prompting for missing values.")
 
         import_watchlist = subcommands.add_parser("import-watchlist", help="Import a company watchlist CSV locally.")
         import_watchlist.add_argument("--csv", required=True, help="CSV file path.")
@@ -54,6 +138,8 @@ class Command(BaseCommand):
         command = options.get("job_scout_command") or "status"
         if command == "setup":
             self.handle_setup(options)
+        elif command == "providers":
+            self.configure_brain_provider(options)
         elif command == "import-watchlist":
             self.import_watchlist(options["csv"])
         elif command == "run-once":
@@ -71,6 +157,17 @@ class Command(BaseCommand):
         if options.get("resume_file"):
             profile = self.import_resume_file(profile, options["resume_file"])
 
+        if options.get("provider") or not options["non_interactive"]:
+            self.configure_brain_provider(
+                {
+                    "provider": (options.get("provider") or [None])[-1],
+                    "env_file": options["env_file"],
+                    "api_key": "",
+                    "command": "",
+                    "non_interactive": options["non_interactive"],
+                }
+            )
+
         if not options["non_interactive"]:
             updates = self.prompt_profile_updates(profile)
             if updates:
@@ -86,7 +183,6 @@ class Command(BaseCommand):
             self.import_watchlist(options["watchlist_csv"])
 
         generate_search_strategy(profile)
-        self.configure_local_cli_providers(options.get("provider") or [], enable=options["enable_local_cli"])
         self.stdout.write(self.style.SUCCESS("Local setup complete."))
         self.print_status()
 
@@ -118,29 +214,96 @@ class Command(BaseCommand):
             "minimum_confidence_score": self.prompt("Minimum confidence score", default=str(preference.minimum_confidence_score), required=False),
         }
 
-    def configure_local_cli_providers(self, providers, enable: bool):
-        if not providers:
-            return
-
+    def configure_brain_provider(self, options):
         ensure_provider_settings()
-        for provider_name in providers:
-            setting = AgentProviderSetting.objects.get(provider=provider_name)
-            metadata = provider_runtime_status(setting)
-            if not enable:
-                self.stdout.write(self.style.WARNING(f"{setting.label}: left disabled. Pass --enable-local-cli to enable it."))
-                continue
-            if not local_cli_enabled():
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"{setting.label}: not enabled. Start the command with JOB_SCOUT_ENABLE_LOCAL_CLI=true after local CLI login."
-                    )
-                )
-                continue
-            if not metadata["local_cli_command_found"]:
-                self.stdout.write(self.style.WARNING(f"{setting.label}: `{metadata['local_cli_command']}` was not found in PATH."))
-                continue
+        provider_name = normalize_provider_name(options.get("provider"))
+        if not provider_name:
+            if options.get("non_interactive"):
+                raise CommandError("--provider is required in non-interactive mode.")
+            provider_name = self.select_provider()
+
+        setting = AgentProviderSetting.objects.get(provider=provider_name)
+        metadata = provider_runtime_status(setting)
+        env_path = Path(options.get("env_file") or settings.BASE_DIR / ".env").expanduser()
+        updates = {
+            "JOB_SCOUT_RUNTIME_ENV": "local",
+            "JOB_SCOUT_BRAIN_PROVIDER": provider_name,
+        }
+
+        if metadata["is_local_only"]:
+            command = metadata["local_cli_command"]
+            command_path = shutil.which(command) if command else ""
+            if not command_path:
+                self.stdout.write(self.style.WARNING(f"`{command}` was not found in PATH. Install and log in before running this provider."))
+            if not options.get("non_interactive"):
+                confirmed = self.prompt_bool(f"Have you already logged in to {setting.label} in this terminal", default=bool(command_path))
+                if not confirmed:
+                    self.stdout.write(self.style.WARNING("Provider will be written to .env, but runs will fail until the CLI login works."))
+            command_template = options.get("command") or self.default_cli_command_template(provider_name)
+            if not options.get("non_interactive"):
+                command_template = self.prompt("CLI command template", default=command_template, required=True)
+            updates["JOB_SCOUT_ENABLE_LOCAL_CLI"] = "True"
+            updates["JOB_SCOUT_CLI_TIMEOUT_SECONDS"] = "120"
+            updates[f"JOB_SCOUT_{provider_name.upper()}_COMMAND"] = command_template
+            self.apply_runtime_env(updates)
             update_provider_setting(setting, {"enabled": True, "consent_required": True})
-            self.stdout.write(self.style.SUCCESS(f"{setting.label}: enabled for local worker use."))
+        elif provider_name == "direct_api":
+            self.apply_runtime_env(updates)
+            update_provider_setting(setting, {"enabled": True, "consent_required": False})
+        elif provider_name in HOSTED_API_PROVIDERS or setting.api_key_env_var:
+            api_key = options.get("api_key") or ""
+            if not api_key and not options.get("non_interactive") and setting.api_key_env_var:
+                api_key = self.prompt_secret(f"{setting.api_key_env_var}", default=os.environ.get(setting.api_key_env_var, ""))
+            if setting.api_key_env_var and api_key:
+                updates[setting.api_key_env_var] = api_key
+            self.apply_runtime_env(updates)
+            if setting.api_key_env_var and not os.environ.get(setting.api_key_env_var) and provider_name in HOSTED_API_PROVIDERS:
+                raise CommandError(f"{setting.api_key_env_var} is required to enable {setting.label}.")
+            update_provider_setting(setting, {"enabled": True, "consent_required": provider_name != "direct_api"})
+
+        write_env_values(env_path, updates)
+        self.stdout.write(self.style.SUCCESS(f"{setting.label} is now the local Job Scout brain."))
+        self.stdout.write(f"Updated {env_path}")
+
+    def apply_runtime_env(self, updates: dict[str, str]) -> None:
+        os.environ.update(updates)
+        if "JOB_SCOUT_RUNTIME_ENV" in updates:
+            settings.JOB_SCOUT_RUNTIME_ENV = updates["JOB_SCOUT_RUNTIME_ENV"]
+        if "JOB_SCOUT_BRAIN_PROVIDER" in updates:
+            settings.JOB_SCOUT_BRAIN_PROVIDER = updates["JOB_SCOUT_BRAIN_PROVIDER"]
+        if "JOB_SCOUT_ENABLE_LOCAL_CLI" in updates:
+            settings.JOB_SCOUT_ENABLE_LOCAL_CLI = updates["JOB_SCOUT_ENABLE_LOCAL_CLI"].lower() in {"1", "true", "yes"}
+        if "JOB_SCOUT_CLI_TIMEOUT_SECONDS" in updates:
+            settings.JOB_SCOUT_CLI_TIMEOUT_SECONDS = int(updates["JOB_SCOUT_CLI_TIMEOUT_SECONDS"])
+
+    def select_provider(self) -> str:
+        providers = {provider.provider: provider for provider in ensure_provider_settings()}
+        ordered = [name for name in provider_names() if name in providers]
+        self.stdout.write("")
+        self.stdout.write(self.style.MIGRATE_HEADING("Select local brain provider"))
+        for index, provider_name in enumerate(ordered, start=1):
+            provider = providers[provider_name]
+            metadata = provider_runtime_status(provider)
+            brain_marker = " current" if provider_name == selected_brain_provider() else ""
+            scope = "local CLI" if metadata["is_local_only"] else "API"
+            self.stdout.write(f"{index}. {provider.label} [{scope}]{brain_marker}")
+        choice = self.prompt("Provider number", default="1", required=True)
+        try:
+            index = int(choice)
+        except ValueError as exc:
+            raise CommandError("Provider selection must be a number.") from exc
+        if index < 1 or index > len(ordered):
+            raise CommandError("Provider selection is out of range.")
+        return ordered[index - 1]
+
+    def default_cli_command_template(self, provider_name: str) -> str:
+        defaults = {
+            "gemini_cli": "gemini -p {prompt}",
+            "claude_code_cli": "claude -p {prompt}",
+            "codex_cli": "codex exec {prompt}",
+            "opencode": "opencode run {prompt}",
+        }
+        return defaults.get(provider_name, f"{provider_name} {{prompt}}")
 
     def import_resume_file(self, profile, path_value: str):
         path = Path(path_value).expanduser()
@@ -185,6 +348,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING("Job Scout local status"))
         self.stdout.write(f"Database: {connection.vendor}")
         self.stdout.write(f"Runtime: {runtime_environment()}")
+        self.stdout.write(f"Brain provider: {selected_brain_provider()}")
         self.stdout.write(f"Local CLI enabled: {'yes' if local_cli_enabled() else 'no'}")
         self.stdout.write(f"Profile: {'ready' if profile.profile_completeness_score >= 70 else 'needs setup'} ({profile.profile_completeness_score}/100)")
         self.stdout.write(f"Notifications: {'email' if preference.email_address else preference.digest_channel}")
@@ -195,15 +359,17 @@ class Command(BaseCommand):
             enabled = "enabled" if provider.enabled else "disabled"
             scope = metadata["runtime_scope"]
             status = metadata["configuration_status"]
-            self.stdout.write(f"- {provider.label}: {enabled}, {scope}, {status}")
+            brain_marker = ", brain" if metadata["is_brain"] else ""
+            self.stdout.write(f"- {provider.label}: {enabled}, {scope}, {status}{brain_marker}")
             if metadata["setup_hint"]:
                 self.stdout.write(f"  {metadata['setup_hint']}")
         self.stdout.write("")
         self.stdout.write("Useful commands:")
+        self.stdout.write("  ./scripts/job-scout providers")
         self.stdout.write("  ./scripts/job-scout setup")
         self.stdout.write("  ./scripts/job-scout import-watchlist --csv companies.csv")
         self.stdout.write("  ./scripts/job-scout run-once --force")
-        self.stdout.write("  JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider gemini_cli --enable-local-cli")
+        self.stdout.write("  ./scripts/job-scout providers --provider gemini_cli")
 
     def prompt(self, label: str, default: str = "", required: bool = False) -> str:
         suffix = f" [{default}]" if default else ""
@@ -216,6 +382,11 @@ class Command(BaseCommand):
             if not required:
                 return ""
             self.stdout.write(self.style.ERROR(f"{label} is required."))
+
+    def prompt_secret(self, label: str, default: str = "") -> str:
+        suffix = " [already set]" if default else ""
+        value = getpass(f"{label}{suffix}: ").strip()
+        return value or default
 
     def prompt_list(self, label: str, default: list[str] | None = None) -> list[str]:
         default = default or []

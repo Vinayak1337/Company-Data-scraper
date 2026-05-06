@@ -32,8 +32,8 @@ export async function runAgentAction(formData: FormData) {
   try {
     await startAgentRun({
       agent_type: agentType,
-      provider: "direct_api",
       tool_policy: "read_only",
+      user_consent: true,
     });
     revalidatePath("/");
   } catch (error) {

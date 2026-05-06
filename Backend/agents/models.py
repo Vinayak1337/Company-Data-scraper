@@ -9,6 +9,7 @@ class AgentProviderSetting(models.Model):
         ("deepseek", "DeepSeek"),
         ("gemini_cli", "Gemini CLI"),
         ("claude_code_cli", "Claude Code CLI"),
+        ("codex_cli", "Codex CLI"),
         ("opencode", "OpenCode"),
     ]
 

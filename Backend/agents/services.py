@@ -2,6 +2,7 @@ import os
 import shutil
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.db.models import Sum
@@ -21,6 +22,7 @@ from agents.models import (
 from agents.observability import execute_with_optional_langsmith
 from agents.runtime import (
     DisabledRuntimeAdapter,
+    LocalCliReviewAdapter,
     LocalMatchReviewAdapter,
     LocalNotificationReviewAdapter,
     LocalProfileBuilderAdapter,
@@ -106,6 +108,20 @@ PROVIDER_DEFAULTS = [
         "notes": "Local-only CLI provider. Requires local terminal login and JOB_SCOUT_ENABLE_LOCAL_CLI=true.",
     },
     {
+        "provider": "codex_cli",
+        "label": "Codex CLI",
+        "model_name": "",
+        "enabled": False,
+        "worker_only": True,
+        "api_key_env_var": "",
+        "default_tool_policy": "safe_shell",
+        "consent_required": True,
+        "daily_run_limit": 10,
+        "monthly_budget_cents": 0,
+        "estimated_cost_per_run_cents": 0,
+        "notes": "Local-only CLI provider. Requires local terminal login and JOB_SCOUT_ENABLE_LOCAL_CLI=true.",
+    },
+    {
         "provider": "opencode",
         "label": "OpenCode",
         "model_name": "",
@@ -133,27 +149,52 @@ BLOCKED_POLICY_LEVELS = {"external_action"}
 LOCAL_CLI_COMMANDS = {
     "gemini_cli": "gemini",
     "claude_code_cli": "claude",
+    "codex_cli": "codex",
     "opencode": "opencode",
 }
 HOSTED_API_PROVIDERS = {"openrouter", "deepseek"}
 
 
 def runtime_environment() -> str:
-    value = str(getattr(settings, "JOB_SCOUT_RUNTIME_ENV", "local") or "local").strip().lower()
+    value = env_setting("JOB_SCOUT_RUNTIME_ENV", getattr(settings, "JOB_SCOUT_RUNTIME_ENV", "local")).strip().lower()
     if value in {"hosted", "production", "prod", "render"}:
         return "hosted"
     return "local"
 
 
 def local_cli_enabled() -> bool:
-    return runtime_environment() == "local" and bool(getattr(settings, "JOB_SCOUT_ENABLE_LOCAL_CLI", False))
+    value = env_setting("JOB_SCOUT_ENABLE_LOCAL_CLI", str(getattr(settings, "JOB_SCOUT_ENABLE_LOCAL_CLI", False)))
+    return runtime_environment() == "local" and value.strip().lower() in {"1", "true", "yes"}
+
+
+def selected_brain_provider() -> str:
+    configured = env_setting("JOB_SCOUT_BRAIN_PROVIDER", getattr(settings, "JOB_SCOUT_BRAIN_PROVIDER", "direct_api")).strip()
+    allowed = {defaults["provider"] for defaults in PROVIDER_DEFAULTS}
+    return configured if configured in allowed else "direct_api"
+
+
+def env_setting(key: str, default: str = "") -> str:
+    value = os.environ.get(key)
+    if value not in {None, ""}:
+        return str(value)
+    env_path = Path(getattr(settings, "BASE_DIR", ".")) / ".env"
+    if not env_path.exists():
+        return str(default or "")
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        item_key, item_value = stripped.split("=", 1)
+        if item_key.strip() == key:
+            return item_value.strip().strip("'\"")
+    return str(default or "")
 
 
 def provider_runtime_status(provider_setting: AgentProviderSetting) -> dict:
     is_local_cli = provider_setting.worker_only or provider_setting.provider in LOCAL_CLI_COMMANDS
     command = LOCAL_CLI_COMMANDS.get(provider_setting.provider, "")
     command_path = shutil.which(command) if command else ""
-    api_key_configured = bool(provider_setting.api_key_env_var and os.environ.get(provider_setting.api_key_env_var))
+    api_key_configured = bool(provider_setting.api_key_env_var and env_setting(provider_setting.api_key_env_var))
     can_run_here = True
     configuration_status = "ready" if provider_setting.enabled else "disabled"
     setup_hint = ""
@@ -184,6 +225,8 @@ def provider_runtime_status(provider_setting: AgentProviderSetting) -> dict:
 
     return {
         "runtime_environment": runtime_environment(),
+        "brain_provider": selected_brain_provider(),
+        "is_brain": provider_setting.provider == selected_brain_provider(),
         "runtime_scope": "local_cli" if is_local_cli else "api",
         "is_local_only": is_local_cli,
         "can_run_here": can_run_here,
@@ -252,7 +295,7 @@ def update_provider_setting(provider_setting: AgentProviderSetting, updates: dic
                 raise ValueError(f"Install and log in to the `{command}` CLI before enabling {provider_setting.label}.")
         if field == "enabled" and value and provider_setting.provider in HOSTED_API_PROVIDERS:
             env_var = provider_setting.api_key_env_var
-            if env_var and not os.environ.get(env_var):
+            if env_var and not env_setting(env_var):
                 raise ValueError(f"Set {env_var} in the local environment before enabling {provider_setting.label}.")
         if field == "api_key_env_var" and provider_setting.worker_only:
             value = ""
@@ -269,27 +312,28 @@ def update_provider_setting(provider_setting: AgentProviderSetting, updates: dic
 @transaction.atomic
 def start_agent_run(
     agent_type: str,
-    provider: str = "direct_api",
+    provider: str = "",
     model_name: str = "",
     tool_policy: str = "",
     user_consent: bool = False,
 ) -> AgentRun:
     ensure_provider_settings()
     validate_agent_type(agent_type)
-    provider_setting = AgentProviderSetting.objects.get(provider=provider)
+    selected_provider = provider or selected_brain_provider()
+    provider_setting = AgentProviderSetting.objects.get(provider=selected_provider)
     selected_policy = tool_policy or provider_setting.default_tool_policy
     validate_tool_policy(selected_policy)
     assert_provider_runtime_allowed(provider_setting, user_consent)
 
     run = AgentRun.objects.create(
         agent_type=agent_type,
-        provider=provider,
+        provider=selected_provider,
         model_name=model_name or provider_setting.model_name,
         tool_policy=selected_policy,
         prompt_version=AGENT_PROMPT_VERSIONS.get(agent_type, "unknown"),
         input_snapshot=build_input_snapshot(agent_type, provider_setting),
     )
-    add_audit(run, "run_created", "Agent run created.", {"agent_type": agent_type, "provider": provider})
+    add_audit(run, "run_created", "Agent run created.", {"agent_type": agent_type, "provider": selected_provider})
     record_permissions(run, selected_policy)
     if agent_execution_mode() == "inline":
         execute_agent_run(run)
@@ -447,6 +491,14 @@ def adapter_for_run(run: AgentRun):
         return DisabledRuntimeAdapter()
     if provider_setting.worker_only:
         metadata = provider_runtime_status(provider_setting)
+        if metadata["can_run_here"]:
+            add_step(
+                run,
+                "Local CLI brain",
+                "running",
+                f"Sending review context to {provider_setting.label} from the local terminal.",
+            )
+            return LocalCliReviewAdapter(provider=provider_setting.provider, label=provider_setting.label)
         add_step(
             run,
             "Local CLI guard",
@@ -474,6 +526,7 @@ def agent_runtime_status() -> dict:
     ensure_provider_settings()
     return {
         "runtime_environment": runtime_environment(),
+        "brain_provider": selected_brain_provider(),
         "execution_mode": agent_execution_mode(),
         "local_cli_enabled": local_cli_enabled(),
         "queue_batch_size": getattr(settings, "AGENT_QUEUE_BATCH_SIZE", 5),
@@ -542,8 +595,9 @@ def build_input_snapshot(agent_type: str, provider_setting: AgentProviderSetting
         "provider": provider_setting.provider,
         "provider_enabled": provider_setting.enabled,
         "worker_only": provider_setting.worker_only,
-        "api_key_configured": bool(provider_setting.api_key_env_var and os.environ.get(provider_setting.api_key_env_var)),
+        "api_key_configured": bool(provider_setting.api_key_env_var and env_setting(provider_setting.api_key_env_var)),
         "runtime_environment": runtime_environment(),
+        "brain_provider": selected_brain_provider(),
         "runtime_scope": provider_runtime_status(provider_setting)["runtime_scope"],
         "local_cli_enabled": local_cli_enabled(),
     }

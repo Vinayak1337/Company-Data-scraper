@@ -49,17 +49,18 @@ Local setup can also be driven directly from the project root:
 
 ```bash
 ./scripts/job-scout status
+./scripts/job-scout providers
 ./scripts/job-scout setup --resume-file resume.md --watchlist-csv companies.csv
 ./scripts/job-scout import-watchlist --csv companies.csv
 ./scripts/job-scout run-once --force
 ```
 
-CLI-based AI providers are local-only because they require terminal login state. Start the backend or worker with an explicit local opt-in before enabling them:
+Provider setup is terminal-only. `./scripts/job-scout providers` opens a numbered selector, writes `Backend/.env`, and marks the selected provider as the local Job Scout brain. CLI-based providers are local-only because they require terminal login state:
 
 ```bash
-JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider gemini_cli --enable-local-cli
-JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider claude_code_cli --enable-local-cli
-JOB_SCOUT_ENABLE_LOCAL_CLI=true ./scripts/job-scout setup --provider opencode --enable-local-cli
+./scripts/job-scout providers --provider gemini_cli
+./scripts/job-scout providers --provider claude_code_cli
+./scripts/job-scout providers --provider codex_cli
 ```
 
 Local email defaults to Django's console backend. Configure SMTP for real delivery:

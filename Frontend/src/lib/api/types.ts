@@ -357,6 +357,8 @@ export type AgentProvider = {
   api_key_env_var: string;
   api_key_configured: boolean;
   runtime_environment: string;
+  brain_provider: string;
+  is_brain: boolean;
   runtime_scope: "api" | "local_cli" | string;
   is_local_only: boolean;
   can_run_here: boolean;
@@ -375,6 +377,7 @@ export type AgentProvider = {
 
 export type AgentRuntimeStatus = {
   runtime_environment: string;
+  brain_provider: string;
   execution_mode: string;
   local_cli_enabled: boolean;
   queue_batch_size: number;

@@ -5,6 +5,23 @@ from urllib.parse import parse_qs, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_env_file(BASE_DIR / ".env")
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-change-me")
 DEBUG = os.environ.get("DEBUG", "False").lower() in {"1", "true", "yes"}
 
@@ -145,6 +162,8 @@ AGENT_EXECUTION_MODE = os.environ.get("AGENT_EXECUTION_MODE", "inline").strip().
 AGENT_QUEUE_BATCH_SIZE = int(os.environ.get("AGENT_QUEUE_BATCH_SIZE", "5"))
 JOB_SCOUT_RUNTIME_ENV = os.environ.get("JOB_SCOUT_RUNTIME_ENV", "local").strip().lower()
 JOB_SCOUT_ENABLE_LOCAL_CLI = os.environ.get("JOB_SCOUT_ENABLE_LOCAL_CLI", "False").lower() in {"1", "true", "yes"}
+JOB_SCOUT_BRAIN_PROVIDER = os.environ.get("JOB_SCOUT_BRAIN_PROVIDER", "direct_api").strip() or "direct_api"
+JOB_SCOUT_CLI_TIMEOUT_SECONDS = int(os.environ.get("JOB_SCOUT_CLI_TIMEOUT_SECONDS", "120"))
 
 LANGSMITH_TRACING = os.environ.get("LANGSMITH_TRACING", "False").lower() in {"1", "true", "yes"}
 LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "job-scout-v3").strip()

@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { Cpu, Save, Terminal, Workflow } from "lucide-react";
+import { Cpu, Terminal, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input, Select } from "@/components/ui/form-controls";
@@ -20,7 +20,7 @@ import {
   toApiResult,
 } from "@/lib/api";
 import type { AgentProvider, NotificationPreferences } from "@/lib/api";
-import { updateAgentProviderAction, updateNotificationPreferencesAction } from "./actions";
+import { updateNotificationPreferencesAction } from "./actions";
 
 type SettingsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -114,9 +114,12 @@ function AiSettings({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <PageSection
         title="Providers"
-        description="Wire providers locally first. API providers use env vars; CLI providers require a logged-in local terminal and never run in hosted web services."
+        description="Provider setup is terminal-only. Use ./scripts/job-scout providers to select the project brain and write Backend/.env."
       >
         <div className="space-y-4 p-4">
+          <div className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-3 font-mono text-xs text-[var(--ink-2)]">
+            ./scripts/job-scout providers
+          </div>
           <ProviderGroup
             icon={<Cpu className="h-4 w-4" aria-hidden />}
             title="API providers"
@@ -170,15 +173,10 @@ function ProviderGroup({
 }
 
 function ProviderCard({ provider }: { provider: AgentProvider }) {
-  const canToggle = !provider.is_local_only || provider.can_run_here;
-
   return (
-    <form
-      action={updateAgentProviderAction}
+    <div
       className="rounded-md border border-[var(--line)] bg-[var(--bg-sunken)] p-4"
     >
-      <input type="hidden" name="provider" value={provider.provider} />
-      {!canToggle ? <input type="hidden" name="enabled" value="false" /> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -190,27 +188,28 @@ function ProviderCard({ provider }: { provider: AgentProvider }) {
             <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--ink-3)]">{provider.setup_hint}</p>
           ) : null}
         </div>
-        <Button type="submit" variant="primary" size="sm" className="self-start">
-          <Save className="h-3.5 w-3.5" aria-hidden />
-          Save
-        </Button>
+        <StatusBadge tone={provider.is_brain ? "success" : "neutral"} withDot>
+          {provider.is_brain ? "Brain" : "Standby"}
+        </StatusBadge>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <TextInput label={provider.is_local_only ? "CLI profile" : "Model"} name="model_name" defaultValue={provider.model_name} />
+        <ProviderReadout label={provider.is_local_only ? "CLI profile" : "Model"} value={provider.model_name || "default"} />
         {provider.is_local_only ? (
           <ProviderReadout icon={<Terminal className="h-3.5 w-3.5" aria-hidden />} label="Command" value={provider.local_cli_command || "not configured"} />
         ) : (
-          <TextInput label="Key env var" name="api_key_env_var" defaultValue={provider.api_key_env_var} />
+          <ProviderReadout label="Key env var" value={provider.api_key_env_var || "not required"} />
         )}
-        <TextInput label="Daily limit" name="daily_run_limit" type="number" min="0" defaultValue={String(provider.daily_run_limit)} />
+        <ProviderReadout label="Daily limit" value={String(provider.daily_run_limit)} />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-4 border-t border-[var(--line)] pt-3">
-        <ToggleField name="enabled" label="Enabled" defaultChecked={provider.enabled} disabled={!canToggle} />
-        <ToggleField name="consent_required" label="Consent required" defaultChecked={provider.consent_required} />
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--line)] pt-3">
+        <StatusBadge tone={provider.enabled ? "success" : "neutral"}>{provider.enabled ? "Enabled" : "Disabled"}</StatusBadge>
+        <StatusBadge tone={provider.consent_required ? "warning" : "neutral"}>
+          {provider.consent_required ? "Consent required" : "No consent gate"}
+        </StatusBadge>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -243,7 +242,7 @@ function ProviderReadout({
   label,
   value,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: string;
 }) {
@@ -251,7 +250,7 @@ function ProviderReadout({
     <div>
       <span className="text-xs font-medium text-[var(--muted)]">{label}</span>
       <div className="mt-1 flex h-8 items-center gap-2 rounded-[3px] border border-[var(--line)] bg-[var(--bg-raised)] px-3 font-mono text-[12px] text-[var(--ink-2)]">
-        <span className="text-[var(--accent)]">{icon}</span>
+        {icon ? <span className="text-[var(--accent)]">{icon}</span> : null}
         <span className="truncate">{value}</span>
       </div>
     </div>
@@ -269,6 +268,7 @@ function RuntimeSettings({ runtime }: { runtime: AgentRuntimeStatus | null }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <RuntimeStat icon={<Workflow className="h-4 w-4" aria-hidden />} label="Execution" value={runtime?.execution_mode ?? "unknown"} />
           <RuntimeStat icon={<Terminal className="h-4 w-4" aria-hidden />} label="Environment" value={runtime?.runtime_environment ?? "unknown"} />
+          <RuntimeStat label="Brain" value={runtime?.brain_provider ?? "direct_api"} />
           <RuntimeStat label="Queued" value={String(runtime?.queued_runs ?? 0)} />
           <RuntimeStat label="Running" value={String(runtime?.running_runs ?? 0)} />
         </div>
@@ -378,18 +378,6 @@ function TextInput({
     <label>
       <span className="text-xs font-medium text-[var(--muted)]">{label}</span>
       <Input {...props} />
-    </label>
-  );
-}
-
-function ToggleField({
-  label,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  return (
-    <label className="flex min-h-6 items-center gap-2 text-sm text-[var(--muted)]">
-      <input type="checkbox" {...props} />
-      <span>{label}</span>
     </label>
   );
 }

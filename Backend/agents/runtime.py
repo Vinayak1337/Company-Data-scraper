@@ -1,4 +1,11 @@
+import json
+import os
+import shlex
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+
+from django.conf import settings
 
 
 @dataclass(frozen=True)
@@ -25,6 +32,90 @@ class RuntimeAdapter:
 
     def summarize_failure(self, error: Exception) -> str:
         return str(error) or error.__class__.__name__
+
+
+class LocalCliReviewAdapter(RuntimeAdapter):
+    adapter_name = "local_cli_review"
+    DEFAULT_COMMANDS = {
+        "gemini_cli": ["gemini", "-p", "{prompt}"],
+        "claude_code_cli": ["claude", "-p", "{prompt}"],
+        "codex_cli": ["codex", "exec", "{prompt}"],
+        "opencode": ["opencode", "run", "{prompt}"],
+    }
+
+    def __init__(self, provider: str, label: str):
+        self.provider = provider
+        self.label = label
+
+    def execute(self, invocation_payload: dict) -> RuntimeResult:
+        prompt = cli_review_prompt(invocation_payload)
+        args = self.command_args(prompt)
+        timeout = int(env_setting("JOB_SCOUT_CLI_TIMEOUT_SECONDS", "120") or "120")
+        try:
+            completed = subprocess.run(
+                args,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=timeout,
+            )
+        except FileNotFoundError:
+            return RuntimeResult(
+                status="failed",
+                output={"provider": self.provider},
+                artifacts=[],
+                error=f"{self.label} command was not found in PATH.",
+            )
+        except subprocess.TimeoutExpired:
+            return RuntimeResult(
+                status="failed",
+                output={"provider": self.provider},
+                artifacts=[],
+                error=f"{self.label} timed out after {timeout} seconds.",
+            )
+
+        output = completed.stdout.strip()
+        error_output = completed.stderr.strip()
+        if completed.returncode != 0:
+            return RuntimeResult(
+                status="failed",
+                output={"provider": self.provider, "stderr": error_output[:4000]},
+                artifacts=[],
+                error=error_output[:1000] or f"{self.label} exited with status {completed.returncode}.",
+            )
+
+        content = output or "(CLI returned no text.)"
+        return RuntimeResult(
+            status="success",
+            output={
+                "provider": self.provider,
+                "cli_review": content[:20000],
+                "proposals": [
+                    {
+                        "decision_type": "cli_brain_review",
+                        "question": f"Review {self.label}'s local brain output?",
+                        "changes": {"provider": self.provider, "review": content[:4000]},
+                        "applies_automatically": False,
+                    }
+                ],
+            },
+            artifacts=[
+                {
+                    "artifact_type": "markdown",
+                    "title": f"{self.label} Brain Review",
+                    "content": content,
+                    "metadata": {"provider": self.provider},
+                }
+            ],
+        )
+
+    def command_args(self, prompt: str) -> list[str]:
+        env_key = f"JOB_SCOUT_{self.provider.upper()}_COMMAND"
+        configured = env_setting(env_key, "").strip()
+        if configured:
+            parts = shlex.split(configured)
+            return [prompt if part == "{prompt}" else part for part in parts] if "{prompt}" in parts else [*parts, prompt]
+        return [prompt if part == "{prompt}" else part for part in self.DEFAULT_COMMANDS.get(self.provider, [self.provider, "{prompt}"])]
 
 
 class LocalProfileBuilderAdapter(RuntimeAdapter):
@@ -240,8 +331,48 @@ class DisabledRuntimeAdapter(RuntimeAdapter):
             status="skipped",
             output={"disabled": True, "provider": provider},
             artifacts=[],
-            error=f"{provider} runtime is disabled or worker-only in this build wave.",
+            error=f"{provider} runtime is disabled or unavailable in this local process.",
         )
+
+
+def cli_review_prompt(invocation_payload: dict) -> str:
+    context = invocation_payload.get("context") or {}
+    agent_type = context.get("agent_type", "agent_review")
+    compact_context = json.dumps(context, ensure_ascii=True, indent=2, default=str)[:60000]
+    return "\n".join(
+        [
+            "You are the local Job Scout brain running from a developer terminal.",
+            "Review the structured context and return a concise, actionable markdown report.",
+            "Do not take external actions, send emails, modify files, or browse unless the caller explicitly asks in a later tool.",
+            f"Agent type: {agent_type}",
+            "",
+            "Return sections:",
+            "1. Decision summary",
+            "2. Strong signals",
+            "3. Risks or missing data",
+            "4. Recommended next action",
+            "",
+            "Context JSON:",
+            compact_context,
+        ]
+    )
+
+
+def env_setting(key: str, default: str = "") -> str:
+    value = os.environ.get(key)
+    if value not in {None, ""}:
+        return str(value)
+    env_path = Path(getattr(settings, "BASE_DIR", ".")) / ".env"
+    if not env_path.exists():
+        return str(default or "")
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        item_key, item_value = stripped.split("=", 1)
+        if item_key.strip() == key:
+            return item_value.strip().strip("'\"")
+    return str(default or "")
 
 
 def profile_readiness_score(profile: dict, target_titles: list[dict], claims: list[dict]) -> int:
