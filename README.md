@@ -39,7 +39,13 @@ V3 focuses on one useful loop:
 ```
 
 The root `jobscout` command manages both `Backend/` and `Frontend/`.
-Use `./jobscout ...` from the repo root, or `jobscout ...` if the repo root is on your `PATH`.
+Use `./jobscout ...` from the repo root. If you want the plain `jobscout ...` command inside your active virtualenv, install a local symlink once:
+
+```bash
+./jobscout install-command
+jobscout init
+```
+
 `./jobscout init` writes the local setup marker at `.jobscout/setup.json`. Backend and frontend runtime commands intentionally exit before boot if that marker is missing.
 
 ```bash
