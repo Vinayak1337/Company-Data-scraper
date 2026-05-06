@@ -33,7 +33,7 @@ from companies.services import (
     upsert_company_job_source,
 )
 from jobs.models import Job
-from matching.models import MatchFeedback
+from matching.models import JobMatch, MatchFeedback
 from matching.services import record_match_feedback, refresh_job_match, refresh_job_matches, serialize_job_match
 from notifications.services import (
     create_notification_event,
@@ -624,9 +624,9 @@ def agent_provider_updates_from_payload(payload: dict) -> dict:
 
 
 def refresh_current_matches_count() -> int:
-    jobs = list(Job.objects.select_related("company").order_by("-first_seen_at")[:100])
-    matches = refresh_job_matches(jobs)
-    return sum(1 for match in matches.values() if match.should_notify)
+    # Diagnostics must stay read-only. The jobs endpoint refreshes match scores;
+    # doing that here too can create concurrent writes during page load.
+    return JobMatch.objects.filter(should_notify=True).count()
 
 
 def refresh_new_job_matches(company: Company) -> None:
